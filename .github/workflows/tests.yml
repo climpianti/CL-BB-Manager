@@ -18,6 +18,8 @@ jobs:
         run: python -m compileall -q custom_components tests
       - name: Validate JavaScript syntax
         run: node --check custom_components/cl_bb_manager/frontend/panel.js
+      - name: Run frontend error-regression tests
+        run: node --test tests/test_panel.mjs
       - name: Validate manifest JSON
         run: python -m json.tool custom_components/cl_bb_manager/manifest.json > /dev/null
       - name: Install tests
@@ -32,10 +34,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Create HA demo integration ZIP
-        run: zip -r CL-BB-Manager-0.2.0-alpha.1.zip custom_components/cl_bb_manager -x '*.pyc' -x '*/__pycache__/*'
+        run: zip -r CL-BB-Manager-0.3.2-alpha.2.zip custom_components/cl_bb_manager -x '*.pyc' -x '*/__pycache__/*'
       - uses: actions/upload-artifact@v4
         with:
           name: CL-BB-Manager-demo-install
-          path: CL-BB-Manager-0.2.0-alpha.1.zip
+          path: CL-BB-Manager-0.3.2-alpha.2.zip
           if-no-files-found: error
           retention-days: 30
