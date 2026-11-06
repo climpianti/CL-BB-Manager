@@ -1,32 +1,24 @@
 # Roadmap CL B&B Manager
 
-## 0.1.0-alpha.1 — base iniziale
-- [x] Integrazione con config flow Home Assistant
-- [x] Modello di varchi dinamici e PIN temporanei
-- [x] Persistenza locale e test unitari di base
+## 0.1 e 0.2 — completato
+- [x] Config flow e pannello administrator Home Assistant
+- [x] Varchi dinamici, gestione prenotazioni, PIN protetti
+- [x] Registro eventi amministrativi e test unitari base
+- [x] Collegamento ai cinque script virtuali della demo
 
-## 0.2.0-alpha.1 — prima UI gestionale (codice pubblicato)
-- [x] Pannello amministratore responsive nel menu laterale
-- [x] API WebSocket con controllo amministratore
-- [x] Creazione, modifica, abilitazione, disabilitazione ed eliminazione varchi
-- [x] Prenotazioni, generazione PIN mostrato una sola volta e revoca
-- [x] Registro degli eventi amministrativi
-- [x] Workflow CI per sintassi e test di modello
-- [ ] Conferma esecuzione dei test CI
-- [ ] Installazione e collaudo funzionale su HA demo 2026.10.4
-- [ ] Test grafici su desktop e mobile
-
-## 0.3 — prova QR e controllo varchi virtuali
-- [ ] Endpoint QR pubblico separato dai privilegi di Home Assistant
-- [ ] Generazione QR permanente, rotazione e stampa
-- [ ] Validazione PIN e autorizzazioni solo lato server
-- [ ] Rate limit persistente, protezioni contro abuso e revisione di sicurezza
-- [ ] Invio comando soltanto allo script virtuale autorizzato
-- [ ] Test end-to-end: check-in, scadenza, revoca, camera non autorizzata
+## 0.3 alpha — QR / accesso demo (codice pubblicato)
+- [x] QR permanente per varco, scaricabile come SVG da un amministratore
+- [x] Pagina ospiti con modulo PIN e autorizzazione backend
+- [x] Allowlist rigida di soli cinque script di apertura simulata
+- [x] Rate limit in memoria, verifica Origin e scadenza, revoca
+- [x] Accesso pubblico inattivo per impostazione predefinita
+- [ ] Convalida CI dopo commit 0.3
+- [ ] Distribuzione della 0.3 sulla demo Home Assistant
+- [ ] Test end-to-end in ambiente isolato, incluso PIN errato/scaduto e altre camere
+- [ ] Gestione avanzata anti-abuso, proxy HTTPS e dispositivi mobili
 
 ## Beta / produzione
-- [ ] Ruoli installatore e gestore con autorizzazioni minime
-- [ ] GDPR, conservazione, cancellazione, backup e ripristino
-- [ ] Calendario, pulizie, clima, integrazioni calendari delle prenotazioni
-- [ ] Test di carico, concorrenza, fail-closed e hardware reale
-- [ ] Eventuale supporto a tastierini fisici
+- [ ] Impostazioni sicure per abilitare il portale ospiti dopo collaudo
+- [ ] Ruoli separati installatore/manager e audit avanzato
+- [ ] GDPR, backup, recupero, sicurezza e prove su hardware reale
+- [ ] Tastierini opzionali, notifiche e calendari
