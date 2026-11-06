@@ -30,7 +30,7 @@ from cl_bb_test_pkg.security import (
 def test_global_persisted_counter_survives_reuse():
     state = {"all": [], "gates": {}}
     for i in range(12):
-        assert charge_attempt(state, "gate1", now=1000.0 + i * 4)
+        assert charge_attempt(state, f"gate{i}", now=1000.0 + i * 4)
     assert not charge_attempt(state, "gate2", now=1050.0)
     snapshot = {"all": state["all"].copy(), "gates": dict(state["gates"])}
     assert not charge_attempt(snapshot, "gate2", now=1052.0)
