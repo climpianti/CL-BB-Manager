@@ -1,6 +1,6 @@
-"""CL B&B Manager: local admin panel and booking management alpha.
+"""CL B&B Manager: admin panel and isolated short-lived LAN QR test sessions.
 
-This alpha never executes door opening services and exposes no public QR endpoint.
+The permanent guest portal is disabled. Only five demo virtual scripts can run.
 """
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from homeassistant.helpers.storage import Store
 
 from .api import register_commands
 from .guest import GuestView
+from .demo_http import DemoPortalView
 from .const import DOMAIN, MAX_EVENTS, PANEL_PATH, PANEL_RESOURCE, STORE_KEY
 from .models import public_booking
 
@@ -27,6 +28,9 @@ class BBManager:
         self.entry = entry
         self.store = Store(hass, 1, STORE_KEY)
         self.lock = asyncio.Lock()
+        # In-memory, expiring administrator-issued LAN QR sessions.
+        # Deliberately not persisted across HA restarts.
+        self.demo_sessions = {}
         self.data = {"gates": [], "bookings": [], "events": []}
 
     async def async_load(self):
@@ -85,6 +89,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         ])
         register_commands(hass)
         hass.http.register_view(GuestView())
+        hass.http.register_view(DemoPortalView())
         domain_data["routes_registered"] = True
 
     await panel_custom.async_register_panel(
