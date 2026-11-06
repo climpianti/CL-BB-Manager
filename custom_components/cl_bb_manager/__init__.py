@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .api import register_commands
+from .guest import GuestView
 from .const import DOMAIN, MAX_EVENTS, PANEL_PATH, PANEL_RESOURCE, STORE_KEY
 from .models import public_booking
 
@@ -83,6 +84,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
             )
         ])
         register_commands(hass)
+        hass.http.register_view(GuestView())
         domain_data["routes_registered"] = True
 
     await panel_custom.async_register_panel(
