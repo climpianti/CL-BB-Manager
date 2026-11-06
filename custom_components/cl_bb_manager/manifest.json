@@ -1,12 +1,15 @@
 {
   "domain": "cl_bb_manager",
   "name": "CL B&B Manager",
-  "version": "0.1.0-alpha.1",
+  "version": "0.2.0-alpha.1",
   "documentation": "https://github.com/climpianti/CL-BB-Manager",
   "issue_tracker": "https://github.com/climpianti/CL-BB-Manager/issues",
   "codeowners": [],
   "dependencies": [
-    "http"
+    "http",
+    "websocket_api",
+    "panel_custom",
+    "frontend"
   ],
   "config_flow": true,
   "requirements": [],
