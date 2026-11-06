@@ -1,26 +1,32 @@
 # Roadmap CL B&B Manager
 
-## Alpha 0.1: struttura dati
+## 0.1.0-alpha.1 — base iniziale
+- [x] Integrazione con config flow Home Assistant
+- [x] Modello di varchi dinamici e PIN temporanei
+- [x] Persistenza locale e test unitari di base
 
-- Integrazione Home Assistant con configurazione iniziale dalla UI
-- Modello varchi dinamico senza hardcode dei cinque varchi demo
-- Modello prenotazioni con PIN protetto e scadenza
-- Test unitari del modello
+## 0.2.0-alpha.1 — prima UI gestionale (codice pubblicato)
+- [x] Pannello amministratore responsive nel menu laterale
+- [x] API WebSocket con controllo amministratore
+- [x] Creazione, modifica, abilitazione, disabilitazione ed eliminazione varchi
+- [x] Prenotazioni, generazione PIN mostrato una sola volta e revoca
+- [x] Registro degli eventi amministrativi
+- [x] Workflow CI per sintassi e test di modello
+- [ ] Conferma esecuzione dei test CI
+- [ ] Installazione e collaudo funzionale su HA demo 2026.10.4
+- [ ] Test grafici su desktop e mobile
 
-## Alpha 0.2: gestione operativa
+## 0.3 — prova QR e controllo varchi virtuali
+- [ ] Endpoint QR pubblico separato dai privilegi di Home Assistant
+- [ ] Generazione QR permanente, rotazione e stampa
+- [ ] Validazione PIN e autorizzazioni solo lato server
+- [ ] Rate limit persistente, protezioni contro abuso e revisione di sicurezza
+- [ ] Invio comando soltanto allo script virtuale autorizzato
+- [ ] Test end-to-end: check-in, scadenza, revoca, camera non autorizzata
 
-- Pannello installatore per aggiungere, modificare, abilitare e disabilitare varchi
-- Configurazione delle entità HA con scelta di comando autorizzato
-- Dashboard prenotazioni e generazione PIN visibile una sola volta
-- Audit dei comandi, revoca, database protetto
-
-## Alpha 0.3: accesso ospiti
-
-- QR permanente per varco e pagina ospiti mobile-first
-- Endpoint pubblico isolato da HA e protetto da rate-limit, anti-bruteforce e controlli server
-- Test end-to-end sui cinque varchi virtuali già presenti in HA
-
-## Beta: sicurezza e operatività
-
-- Concorrenza e controlli per attacchi, GDPR, backup, recupero, test hardware
-- Supporto tastierini fisici in futuro
+## Beta / produzione
+- [ ] Ruoli installatore e gestore con autorizzazioni minime
+- [ ] GDPR, conservazione, cancellazione, backup e ripristino
+- [ ] Calendario, pulizie, clima, integrazioni calendari delle prenotazioni
+- [ ] Test di carico, concorrenza, fail-closed e hardware reale
+- [ ] Eventuale supporto a tastierini fisici
