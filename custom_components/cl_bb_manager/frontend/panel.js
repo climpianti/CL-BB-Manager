@@ -2,11 +2,11 @@ class ClBbManagerPanel extends HTMLElement {
  constructor(){super();this.attachShadow({mode:"open"});this.loaded=false;this.tab="varchi";this.data=null;this.error="";this.pin="";this.testResult=null;this.testBusy=false;}
  set hass(h){this._hass=h;if(!this.loaded){this.loaded=true;this.load();}}
  api(type,body={}){return this._hass.callWS({type:"cl_bb_manager/"+type,...body});}
- async load(){try{this.data=await this.api("list");this.error="";}catch(e){this.error=String(e);}this.render();}
+ async load(){try{this.data=await this.api("list");this.error="";}catch(e){this.error=this.describeError(e);}this.render();}
  async act(type,body={},pin=false){try{const r=await this.api(type,body);this.pin=pin?r.pin_once:"";this.data=pin?r.data:r;this.error="";}catch(e){this.error=this.describeError(e);}this.render();}
  describeError(e){if(typeof e==="string")return e;const candidate=e?.message||e?.error?.message||e?.description||e?.error?.description;return typeof candidate==="string"&&candidate.trim()?candidate:"Operazione non riuscita. Verifica i dati inseriti e riprova.";}
  showValidation(form,message){let note=form.querySelector("[data-cl-validation]");if(!note){note=this.node("div","","notice");note.setAttribute("data-cl-validation","true");note.setAttribute("role","alert");form.prepend(note);}note.textContent=message;}
- async qr(gate){const base=prompt("URL pubblico HTTPS della struttura (es. https://accesso.esempio.it):");if(!base)return;try{const data=await this.api("qr",{gate_id:gate.id,base_url:base});const blob=new Blob([data.svg],{type:"image/svg+xml"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="qr-"+gate.name.toLowerCase().replace(/[^a-z0-9]+/g,"-")+".svg";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);this.error="QR generato. Portale ospiti attualmente disabilitato: non stamparlo per i clienti.";}catch(e){this.error=String(e);}this.render();}
+ async qr(gate){const base=prompt("URL pubblico HTTPS della struttura (es. https://accesso.esempio.it):");if(!base)return;try{const data=await this.api("qr",{gate_id:gate.id,base_url:base});const blob=new Blob([data.svg],{type:"image/svg+xml"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="qr-"+gate.name.toLowerCase().replace(/[^a-z0-9]+/g,"-")+".svg";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);this.error="QR generato. Portale ospiti attualmente disabilitato: non stamparlo per i clienti.";}catch(e){this.error=this.describeError(e);}this.render();}
  node(t,text="",cls=""){const n=document.createElement(t);n.textContent=text;n.className=cls;return n;}
  button(t,cb){const b=this.node("button",t);b.type="button";b.addEventListener("click",cb);return b;}
  field(form,label,name,type="text",value=""){const wrap=this.node("label",label);const inp=this.node("input");inp.name=name;inp.type=type;inp.value=value;inp.required=true;wrap.append(inp);form.append(wrap);return inp;}
@@ -70,7 +70,7 @@ class ClBbManagerPanel extends HTMLElement {
          this.testResult={kind:"denied",message:"Accesso negato. PIN errato, scaduto, revocato o non valido per questo varco."};
        }
      }catch(err){
-       this.testResult={kind:"error",message:"Verifica non riuscita: "+String(err?.message||err).slice(0,180)};
+       this.testResult={kind:"error",message:"Verifica non riuscita: "+this.describeError(err).slice(0,180)};
      }finally{
        this.testBusy=false;this.render();
      }
