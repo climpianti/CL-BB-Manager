@@ -1,10 +1,16 @@
 """Pure unit tests for the booking access rules."""
 from datetime import datetime, timedelta, timezone
 import pytest
-from custom_components.cl_bb_manager.models import (
-    generate_pin, seal_pin, pin_matches, make_booking, make_gate,
-    booking_allows, public_booking
-)
+import importlib.util
+from pathlib import Path
+
+source = Path(__file__).resolve().parents[1] / "custom_components/cl_bb_manager/models.py"
+spec = importlib.util.spec_from_file_location("cl_bb_models", source)
+models = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(models)
+generate_pin, seal_pin, pin_matches = models.generate_pin, models.seal_pin, models.pin_matches
+make_booking, make_gate = models.make_booking, models.make_gate
+booking_allows, public_booking = models.booking_allows, models.public_booking
 
 
 def test_pin_security():
