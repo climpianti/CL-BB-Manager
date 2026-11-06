@@ -1,7 +1,7 @@
 {
   "domain": "cl_bb_manager",
   "name": "CL B&B Manager",
-  "version": "0.2.0-alpha.1",
+  "version": "0.3.0-alpha.1",
   "documentation": "https://github.com/climpianti/CL-BB-Manager",
   "issue_tracker": "https://github.com/climpianti/CL-BB-Manager/issues",
   "codeowners": [],
@@ -12,7 +12,9 @@
     "frontend"
   ],
   "config_flow": true,
-  "requirements": [],
+  "requirements": [
+    "segno==1.6.6"
+  ],
   "iot_class": "local_push",
   "integration_type": "service"
 }
