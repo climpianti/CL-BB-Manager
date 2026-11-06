@@ -213,7 +213,56 @@ def register_commands(hass):
             return
         connection.send_result(msg["id"], manager.summary())
 
+    @websocket_api.websocket_command({
+        "type": "cl_bb_manager/qr",
+        vol.Required("gate_id"): str,
+        vol.Required("base_url"): str,
+    })
+    @websocket_api.async_response
+    async def get_qr(hass, connection, msg):
+        manager = _authorize(hass, connection, msg)
+        if manager is None:
+            return
+        # Use an operator-provided HTTPS public URL. No internal tokens or
+        # HA auth session credentials are embedded in the permanent QR.
+        from urllib.parse import urlsplit
+        from io import BytesIO
+        import segno
+
+        base = msg["base_url"].strip().rstrip("/")
+        parts = urlsplit(base)
+        if (
+            parts.scheme != "https"
+            or not parts.hostname
+            or parts.username is not None
+            or parts.password is not None
+            or parts.query
+            or parts.fragment
+            or parts.path not in ("", "/")
+            or len(base) > 255
+        ):
+            _error(connection, msg, "Inserisci un URL HTTPS pubblico valido, senza percorso.")
+            return
+        gate = next(
+            (g for g in manager.data["gates"] if g["id"] == msg["gate_id"]),
+            None,
+        )
+        if gate is None:
+            _error(connection, msg, "Varco inesistente.")
+            return
+        if len(str(gate.get("token", ""))) < 20:
+            _error(connection, msg, "Token QR non valido.")
+            return
+        target = f"{base}/api/cl_bb_manager/guest/{gate['token']}"
+        buffer = BytesIO()
+        segno.make_qr(target).save(buffer, kind="svg", scale=6, border=3)
+        connection.send_result(msg["id"], {
+            "svg": buffer.getvalue().decode("utf-8"),
+            "url": target,
+            "guest_portal": "disabled",
+        })
+
     for handler in (
-        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking
+        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr
     ):
         websocket_api.async_register_command(hass, handler)
