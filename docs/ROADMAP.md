@@ -30,3 +30,11 @@
 - [x] Test unitari delle autorizzazioni e dei limiti
 - [ ] Collaudo sul server demo dopo caricamento e riavvio
 - [ ] Audit HTTPS/reverse proxy e portale ospiti pubblico (disattivato)
+
+## 0.3.2-alpha.1 — collaudo grafico nel pannello installatore
+- [x] Nuova scheda 'Collaudo accessi' nel pannello Home Assistant
+- [x] Selezione soltanto fra i cinque varchi virtuali abilitati
+- [x] Verifica PIN senza azionamento e prova con impulso virtuale esplicitamente confermato
+- [x] Esito leggibile, nessun PIN salvato nel frontend o nel registro
+- [ ] Verifica del rendering su desktop/mobile e prova locale PIN valido/errato/revocato
+- [ ] Portale ospiti pubblico ancora disattivato
