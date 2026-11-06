@@ -38,3 +38,13 @@
 - [x] Esito leggibile, nessun PIN salvato nel frontend o nel registro
 - [ ] Verifica del rendering su desktop/mobile e prova locale PIN valido/errato/revocato
 - [ ] Portale ospiti pubblico ancora disattivato
+
+## 0.4.0-alpha.1 — collaudo QR locale e temporaneo
+- [x] Generazione QR temporaneo da amministratore, valido 10 minuti, senza account HA per lo smartphone
+- [x] Pagina locale con form PIN, verifica stanza/orario/revoca e apertura limitata ai cinque script virtuali
+- [x] URL vincolato a indirizzi LAN o `*.local`, verifica Host e Origin
+- [x] Tentativi conteggiati e persistiti prima del controllo PIN
+- [x] Test unitari policy locale e simulazione HTTP isolata
+- [ ] Installazione e verifica dell'endpoint demo nell'istanza Home Assistant reale
+- [ ] Collaudo da smartphone sulla stessa rete LAN, con PIN valido/non valido
+- [ ] Audit del reverse proxy e revisione indipendente per il portale permanente
