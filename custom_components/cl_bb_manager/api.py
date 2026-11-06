@@ -10,7 +10,8 @@ from homeassistant.components import websocket_api
 import voluptuous as vol
 
 from .const import DOMAIN, MAX_BOOKINGS, MAX_GATES
-from .models import as_utc, generate_pin, make_booking, make_gate
+from .models import as_utc, generate_pin, make_booking, make_gate, pin_matches
+from .security import charge_attempt, demo_target_allowed, candidate_bookings
 
 
 def _manager(hass):
@@ -262,7 +263,74 @@ def register_commands(hass):
             "guest_portal": "disabled",
         })
 
+    @websocket_api.websocket_command({
+        "type": "cl_bb_manager/demo_check_pin",
+        vol.Required("gate_id"): str,
+        vol.Required("pin"): str,
+        vol.Optional("simulate_open", default=False): bool,
+    })
+    @websocket_api.async_response
+    async def demo_check_pin(hass, connection, msg):
+        """Admin-only test: check access and optionally actuate a virtual script.
+
+        No unauthenticated guest access and NO physical door entities.
+        """
+        from .guest import DEMO_SCRIPTS
+
+        manager = _authorize(hass, connection, msg)
+        if manager is None:
+            return
+        pin = msg["pin"]
+        if not (len(pin) == 8 and pin.isascii() and pin.isdecimal()):
+            _error(connection, msg, "Il PIN deve avere otto cifre.")
+            return
+        try:
+            async with manager.lock:
+                gate = next(
+                    (g for g in manager.data["gates"] if g["id"] == msg["gate_id"]), None
+                )
+                if gate is None or not demo_target_allowed(gate, DEMO_SCRIPTS):
+                    raise ValueError("Varco demo inesistente o non abilitato.")
+                # Counter is persisted before attempting any PIN work.
+                throttle = manager.data.setdefault("attempts", {"all": [], "gates": {}})
+                if not charge_attempt(throttle, gate["id"]):
+                    await manager.async_save()
+                    raise ValueError("Limite di tentativi superato.")
+                await manager.async_save()
+                candidates = candidate_bookings(
+                    manager.data["bookings"], gate["id"]
+                )
+                authorized = False
+                for booking in candidates:
+                    if await hass.async_add_executor_job(pin_matches, pin, booking):
+                        authorized = True
+                        break
+                if not authorized:
+                    manager.audit("demo_pin_denied", gate["id"])
+                    await manager.async_save()
+                    connection.send_result(msg["id"], {"allowed": False, "opened": False})
+                    return
+                if msg["simulate_open"]:
+                    if hass.states.get(gate["entity_id"]) is None:
+                        raise ValueError("Script virtuale non disponibile.")
+                    # Trigger only the allowlisted, verified demo entity.
+                    await hass.services.async_call(
+                        "script", "turn_on",
+                        {"entity_id": gate["entity_id"]}, blocking=True
+                    )
+                    manager.audit("demo_pin_opened", gate["id"])
+                    await manager.async_save()
+                connection.send_result(msg["id"], {
+                    "allowed": True, "opened": bool(msg["simulate_open"])
+                })
+        except ValueError as err:
+            _error(connection, msg, err)
+        except Exception:
+            connection.send_error(
+                msg["id"], "demo_test_failed", "Verifica demo non riuscita."
+            )
+
     for handler in (
-        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr
+        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin
     ):
         websocket_api.async_register_command(hass, handler)
