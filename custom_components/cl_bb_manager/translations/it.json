@@ -1,0 +1,16 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "CL B&B Manager",
+        "description": "Configura il nome della struttura. I varchi e il portale QR saranno inizialmente disabilitati.",
+        "data": {
+          "structure_name": "Nome della struttura"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Il gestore B&B è già configurato."
+    }
+  }
+}
