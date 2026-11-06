@@ -1,5 +1,5 @@
 class ClBbManagerPanel extends HTMLElement {
- constructor(){super();this.attachShadow({mode:"open"});this.loaded=false;this.tab="varchi";this.data=null;this.error="";this.pin="";this.testResult=null;this.testBusy=false;}
+ constructor(){super();this.attachShadow({mode:"open"});this.loaded=false;this.tab="varchi";this.data=null;this.error="";this.pin="";this.testResult=null;this.testBusy=false;this.demoQR=null;}
  set hass(h){this._hass=h;if(!this.loaded){this.loaded=true;this.load();}}
  api(type,body={}){return this._hass.callWS({type:"cl_bb_manager/"+type,...body});}
  async load(){try{this.data=await this.api("list");this.error="";}catch(e){this.error=this.describeError(e);}this.render();}
@@ -20,7 +20,7 @@ class ClBbManagerPanel extends HTMLElement {
  if(!this.data)return;const nav=this.node("nav","","nav");for(const [id,label] of [["varchi","Varchi"],["prenotazioni","Prenotazioni"],["registro","Registro"],["collaudo","Collaudo accessi"]])nav.append(this.button(label,()=>{this.tab=id;this.pin="";this.render();}));page.append(nav);
  const grid=this.node("div","","grid");page.append(grid);
  if(this.tab==="varchi")this.gates(grid);if(this.tab==="prenotazioni")this.bookings(grid);if(this.tab==="registro")this.events(grid);if(this.tab==="collaudo")this.testAccess(grid);
- page.append(this.node("p","ALPHA 0.3.2.2 — Collaudo riservato agli amministratori; QR pubblico disattivato, solo varchi virtuali.","small"));
+ page.append(this.node("p","ALPHA 0.4 — QR demo temporaneo LAN; portale permanente disattivato, solo varchi virtuali.","small"));
  }
  gates(grid){const list=this.card("Gestione varchi");for(const gate of this.data.gates){const line=this.node("div","","item");line.append(this.node("strong",gate.name),this.node("p",gate.entity_id+" · "+gate.kind+" · "+(gate.enabled?"Abilitato":"Disabilitato"),"small"));line.append(this.button("Modifica",()=>this.edit(gate,grid)));line.append(this.button("Scarica QR",()=>this.qr(gate)));line.append(this.button(gate.enabled?"Disabilita":"Abilita",()=>this.act("update_gate",{gate_id:gate.id,name:gate.name,entity_id:gate.entity_id,action:gate.action,kind:gate.kind,enabled:!gate.enabled})));line.append(this.button("Elimina",()=>{if(confirm("Eliminare "+gate.name+"?"))this.act("remove_gate",{gate_id:gate.id});}));list.append(line);}grid.append(list);
  const card=this.card("Aggiungi varco");const form=this.node("form");this.field(form,"Nome varco","name");this.field(form,"Entità HA","entity_id");this.select(form,"Azione","action",[["script.turn_on","Script"],["button.press","Pulsante"],["lock.unlock","Serratura"]],"script.turn_on");this.select(form,"Tipo","kind",[["private","Privato"],["shared","Comune"]],"private");const send=this.node("button","Salva varco disabilitato");send.type="submit";form.append(send);form.onsubmit=e=>{e.preventDefault();this.act("add_gate",Object.fromEntries(new FormData(form)));};card.append(form);grid.append(card);}
@@ -85,6 +85,68 @@ class ClBbManagerPanel extends HTMLElement {
    }
    card.append(this.node("p","I tentativi sono limitati e registrati. Il PIN non viene salvato nel browser e non compare nel registro. Usa soltanto i cinque script di prova.","small"));
    grid.append(card);
+   const qrCard=this.card("QR temporaneo per smartphone · 10 minuti");
+   qrCard.append(this.node(
+     "p",
+     "Il QR è valido solo sulla rete locale e richiede il PIN della prenotazione. " +
+     "Non usare Cloudflare o indirizzi Internet pubblici.",
+     "small"
+   ));
+   const qrForm=this.node("form");
+   this.select(qrForm,"Varco virtuale","gate_id",gates.map(g=>[g.id,g.name]),gates[0].id);
+   const address=this.field(qrForm,"URL locale Home Assistant","base_url","url");
+   address.placeholder="http://192.168.1.100:8123";
+   const create=this.node("button","Genera QR demo");
+   create.type="submit";
+   qrForm.append(create);
+   qrForm.onsubmit=async event=>{
+     event.preventDefault();
+     if(!qrForm.reportValidity() || this.testBusy)return;
+     this.testBusy=true;
+     create.disabled=true;
+     this.error="";
+     try{
+       const values=new FormData(qrForm);
+       const result=await this.api("demo_qr",{
+         gate_id:String(values.get("gate_id")),
+         base_url:String(values.get("base_url"))
+       });
+       this.demoQR={
+         ...result,
+         expires:Date.now()+result.expires_seconds*1000,
+         gate:gates.find(g=>g.id===values.get("gate_id"))?.name||"Varco demo"
+       };
+     }catch(err){
+       this.demoQR=null;
+       this.error=this.describeError(err);
+     }finally{
+       this.testBusy=false;
+       this.render();
+     }
+   };
+   qrCard.append(qrForm);
+   if(this.demoQR){
+     if(Date.now()<this.demoQR.expires){
+       const preview=this.node("div");
+       const img=this.node("img");
+       img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(this.demoQR.svg);
+       img.width=220;
+       img.height=220;
+       img.alt="QR di collaudo temporaneo per "+this.demoQR.gate;
+       preview.append(img);
+       preview.append(this.node("p","Scansiona il QR con lo smartphone connesso alla stessa rete locale.","small"));
+       const link=this.node("a","Apri il collegamento di prova");
+       link.href=this.demoQR.url;
+       link.target="_blank";
+       link.rel="noreferrer noopener";
+       preview.append(link);
+       qrCard.append(preview);
+     }else{
+       this.demoQR=null;
+       qrCard.append(this.node("p","QR scaduto: genera una nuova sessione.","notice"));
+     }
+   }
+   grid.append(qrCard);
    const info=this.card("Stato di sicurezza");
    info.append(this.node("p","Portale QR ospiti: disattivato","small"),
                this.node("p","Target consentiti: cinque script virtuali demo","small"),
