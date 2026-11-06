@@ -2,7 +2,7 @@
 DOMAIN = "cl_bb_manager"
 STORE_KEY = "cl_bb_manager_data"
 PANEL_PATH = "cl-bb-manager"
-PANEL_RESOURCE = "/cl_bb_manager_static/panel.js?v=0.2.0-alpha.1"
+PANEL_RESOURCE = "/cl_bb_manager_static/panel.js?v=0.3.0-alpha.1"
 MAX_GATES = 200
 MAX_BOOKINGS = 1000
 MAX_EVENTS = 200
