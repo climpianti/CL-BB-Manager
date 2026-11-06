@@ -30,3 +30,11 @@ test("Il form verifica la selezione del varco prima di generare il PIN", () => {
   assert.ok(source.includes("Seleziona almeno un varco autorizzato"));
   assert.ok(source.includes("if(b<=a)"));
 });
+
+test("I varchi non propongono QR permanenti disattivati", () => {
+  assert.ok(source.includes("QR prova (LAN)"));
+  assert.ok(!source.includes('this.button("Scarica QR"'));
+  assert.ok(source.includes('this.tab="collaudo"'));
+  assert.ok(source.includes('this.demoTargetGateId=gate.id'));
+  assert.ok(source.includes("I QR con /guest/ restituiscono 404"));
+});
