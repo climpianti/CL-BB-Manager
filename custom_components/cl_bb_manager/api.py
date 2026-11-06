@@ -330,7 +330,69 @@ def register_commands(hass):
                 msg["id"], "demo_test_failed", "Verifica demo non riuscita."
             )
 
+    @websocket_api.websocket_command({
+        "type": "cl_bb_manager/demo_qr",
+        vol.Required("gate_id"): str,
+        vol.Required("base_url"): str,
+    })
+    @websocket_api.async_response
+    async def demo_qr(hass, connection, msg):
+        """Create a single temporary LAN-only QR, for demo scripts only."""
+        import time
+        from io import BytesIO
+        import segno
+        from .demo_policy import (
+            MAX_DEMO_SESSIONS, make_demo_session
+        )
+        from .guest import DEMO_SCRIPTS
+
+        manager = _authorize(hass, connection, msg)
+        if manager is None:
+            return
+        try:
+            gate = next(
+                (g for g in manager.data["gates"] if g["id"] == msg["gate_id"]),
+                None
+            )
+            if gate is None or not demo_target_allowed(gate, DEMO_SCRIPTS):
+                raise ValueError("Seleziona uno dei cinque varchi demo abilitati.")
+            if hass.states.get(gate["entity_id"]) is None:
+                raise ValueError("Script virtuale non disponibile.")
+            # Protect session bookkeeping under the same manager lock.
+            async with manager.lock:
+                now = time.time()
+                manager.demo_sessions = {
+                    token: session
+                    for token, session in manager.demo_sessions.items()
+                    if session.get("expires", 0) > now
+                }
+                if len(manager.demo_sessions) >= MAX_DEMO_SESSIONS:
+                    raise ValueError(
+                        "Sono già attive cinque sessioni. Attendi la scadenza."
+                    )
+                token, session = make_demo_session(
+                    gate["id"], msg["base_url"], now=now
+                )
+                url = (
+                    session["origin"]
+                    + "/api/cl_bb_manager/demo/"
+                    + token
+                )
+                buffer = BytesIO()
+                segno.make_qr(url).save(
+                    buffer, kind="svg", scale=6, border=3
+                )
+                manager.demo_sessions[token] = session
+            connection.send_result(msg["id"], {
+                "svg": buffer.getvalue().decode("utf-8"),
+                "url": url,
+                "expires_seconds": 600,
+                "guest_portal": "disabled",
+            })
+        except (ValueError, TypeError) as err:
+            _error(connection, msg, err)
+
     for handler in (
-        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin
+        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin, demo_qr
     ):
         websocket_api.async_register_command(hass, handler)
