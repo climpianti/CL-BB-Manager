@@ -5,17 +5,16 @@ Do not enable until public endpoint security and proxy tests are complete.
 """
 from __future__ import annotations
 
-from collections import defaultdict, deque
 from html import escape
 from io import BytesIO
 import secrets
-import time
 
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 
 from .const import DOMAIN
-from .models import booking_allows, pin_matches
+from .models import pin_matches
+from .security import charge_attempt, demo_target_allowed, candidate_bookings
 
 # No real actuator entities. These are ONLY the demo script IDs.
 DEMO_SCRIPTS = frozenset({
@@ -25,24 +24,6 @@ DEMO_SCRIPTS = frozenset({
     "script.cl_bb_demo_apri_camera_2",
     "script.cl_bb_demo_apri_camera_3",
 })
-
-_attempts = defaultdict(deque)
-_global = deque()
-
-
-def limited(key):
-    now = time.monotonic()
-    for q, ceiling in ((_attempts[key], 5), (_global, 40)):
-        while q and q[0] <= now - 60:
-            q.popleft()
-        if len(q) >= ceiling:
-            return True
-    _attempts[key].append(now)
-    _global.append(now)
-    if len(_attempts) > 2048:
-        _attempts.clear()
-    return False
-
 
 def manager_of(request):
     return request.app["hass"].data.get(DOMAIN, {}).get("manager")
@@ -55,7 +36,7 @@ def find_gate(manager, token):
         raise web.HTTPNotFound()
     gate = next((g for g in manager.data["gates"]
                  if secrets.compare_digest(str(g["token"]), token)), None)
-    if not gate or not gate["enabled"] or gate["action"] != "script.turn_on" or gate["entity_id"] not in DEMO_SCRIPTS:
+    if not gate or not demo_target_allowed(gate, DEMO_SCRIPTS):
         raise web.HTTPNotFound()
     return gate
 
@@ -109,34 +90,47 @@ class GuestView(HomeAssistantView):
             raise web.HTTPRequestEntityTooLarge(
                 max_size=256, actual_size=request.content_length or 0
             )
-        if limited(request.remote or "unknown"):
-            return page(gate["name"], "Troppi tentativi. Riprova più tardi.", 429)
         try:
             form = await request.post()
         except Exception as exc:
             raise web.HTTPBadRequest() from exc
         pin = str(form.get("pin", ""))
-        if not (len(pin) == 8 and pin.isascii() and pin.isdecimal()):
-            return page(gate["name"], "Codice non valido o scaduto.", 403)
         hass = request.app["hass"]
 
         # Check all candidate bookings under a lock, then trigger only an
         # allowlisted, existing virtual script. Do not expose arbitrary services.
         async with manager.lock:
-            current = next((g for g in manager.data["gates"] if g["id"] == gate["id"]), None)
-            if (not manager.entry.options.get("demo_guest_portal", False)
-                or not current or not current["enabled"]
+            # Persist a failed or successful attempt BEFORE hashing or opening.
+            throttle = manager.data.setdefault("attempts", {"all": [], "gates": {}})
+            try:
+                allowed_attempt = charge_attempt(throttle, gate["id"])
+                await manager.async_save()
+            except (ValueError, TypeError):
+                raise web.HTTPServiceUnavailable()
+            if not allowed_attempt:
+                return page(gate["name"], "Troppi tentativi. Riprova più tardi.", 429)
+            current = next(
+                (g for g in manager.data["gates"] if g["id"] == gate["id"]), None
+            )
+            if (
+                not manager.entry.options.get("demo_guest_portal", False)
+                or not current
+                or not demo_target_allowed(current, DEMO_SCRIPTS)
                 or current["entity_id"] != gate["entity_id"]
-                or current["action"] != "script.turn_on"
-                or current["entity_id"] not in DEMO_SCRIPTS):
+            ):
                 raise web.HTTPForbidden()
-            verified = False
-            for booking in manager.data["bookings"]:
-                if booking_allows(booking, gate["id"]):
-                    if await hass.async_add_executor_job(pin_matches, pin, booking):
-                        verified = True
-                        break
-            if not verified:
+            if not (len(pin) == 8 and pin.isascii() and pin.isdecimal()):
+                return page(gate["name"], "Codice non valido o scaduto.", 403)
+            try:
+                candidates = candidate_bookings(manager.data["bookings"], gate["id"])
+            except ValueError:
+                raise web.HTTPServiceUnavailable()
+            authorized = False
+            for booking in candidates:
+                if await hass.async_add_executor_job(pin_matches, pin, booking):
+                    authorized = True
+                    break
+            if not authorized:
                 manager.audit("guest_denied", gate["id"])
                 await manager.async_save()
                 return page(gate["name"], "Codice non valido o scaduto.", 403)
