@@ -16,6 +16,7 @@ from homeassistant.helpers.storage import Store
 from .api import register_commands
 from .guest import GuestView
 from .demo_http import DemoPortalView
+from .public_http import PublicPilotView
 from .const import DOMAIN, MAX_EVENTS, PANEL_PATH, PANEL_RESOURCE, STORE_KEY
 from .models import public_booking
 
@@ -31,6 +32,7 @@ class BBManager:
         # In-memory, expiring administrator-issued LAN QR sessions.
         # Deliberately not persisted across HA restarts.
         self.demo_sessions = {}
+        self.public_demo_sessions = {}
         self.data = {"gates": [], "bookings": [], "events": []}
 
     async def async_load(self):
@@ -68,6 +70,7 @@ class BBManager:
             "bookings": [public_booking(b) for b in self.data["bookings"]],
             "events": list(self.data["events"][-MAX_EVENTS:]),
             "guest_portal": "disabled",
+            "public_pilot": "enabled" if self.entry.options.get("public_pilot_enabled", False) else "disabled",
             "hardware_control": "disabled",
         }
 
@@ -90,6 +93,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         register_commands(hass)
         hass.http.register_view(GuestView())
         hass.http.register_view(DemoPortalView())
+        hass.http.register_view(PublicPilotView())
         domain_data["routes_registered"] = True
 
     await panel_custom.async_register_panel(
