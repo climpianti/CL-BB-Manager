@@ -82,11 +82,15 @@ def make_gate(
 
 
 def make_booking(
-    room: str, start: str, end: str, gate_ids: list[str], pin: str
+    room: str, start: str, end: str, gate_ids: list[str], pin: str,
+    guest_name: str = "",
 ) -> dict:
-    """Validate reservation window, allowed gates and PIN."""
+    """Validate booking and optional guest label, without saving the PIN."""
     if not room or len(room) > 80:
         raise ValueError("Camera non valida.")
+    guest_name = str(guest_name or "").strip()
+    if len(guest_name) > 80:
+        raise ValueError("Intestatario prenotazione troppo lungo.")
     starts, ends = as_utc(start), as_utc(end)
     if starts >= ends:
         raise ValueError("Il check-out deve seguire il check-in.")
@@ -97,6 +101,7 @@ def make_booking(
     return {
         "id": str(uuid4()),
         "room": room.strip(),
+        "guest_name": guest_name,
         "start": starts.isoformat(),
         "end": ends.isoformat(),
         "gate_ids": gate_ids,
