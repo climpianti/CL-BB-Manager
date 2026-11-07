@@ -72,3 +72,15 @@ test("BlueTech Glass usa i colori ufficiali CL Control e layout responsive", () 
   assert.ok(css.includes("@media(max-width:740px)"));
   assert.ok(css.includes(":focus-visible"));
 });
+
+
+test("Logo CL Impianti ufficiale integrato in pannello e pagina accessi", () => {
+  const css=readFileSync("custom_components/cl_bb_manager/frontend/bluetech-glass.css","utf8");
+  const logo=readFileSync("custom_components/cl_bb_manager/frontend/cl-impianti-logo.svg","utf8");
+  assert.ok(source.includes('logo.alt="CL Impianti"'));
+  assert.ok(source.includes("/cl_bb_manager_static/cl-impianti-logo.svg?v=0.5.0-alpha.4"));
+  assert.ok(css.includes(".brand-logo{"));
+  assert.ok(!css.includes(".brand-mark{"));
+  assert.ok(logo.includes('viewBox="355 90 840 750"'));
+  assert.ok(logo.includes('data:image/png;base64,'));
+});

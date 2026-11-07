@@ -60,10 +60,10 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         "box-shadow:0 22px 65px #0008;backdrop-filter:blur(18px)}"
         ".brand{display:flex;align-items:center;gap:12px;padding-bottom:22px;"
         "border-bottom:1px solid #7aaac53f}"
-        ".mark{width:44px;height:44px;display:grid;place-items:center;border-radius:13px;"
-        "background:linear-gradient(135deg,#19baff,#10628d);font-weight:850;"
-        "box-shadow:0 7px 22px #19baff3e}"
-        ".brand-copy{display:grid;gap:2px}.brand-copy strong{font-size:15px;letter-spacing:.13em}"
+        ""
+        ""
+        ""
+        ".brand-logo{width:68px;height:61px;display:block;object-fit:contain;flex-shrink:0}"".brand-copy{display:grid;gap:2px}.brand-copy strong{font-size:15px;letter-spacing:.13em}"
         ".brand-copy small{font-size:11px;letter-spacing:.11em;color:#8ad9ff}"
         ".eyebrow{margin:26px 0 8px;font-size:11px;letter-spacing:.13em;"
         "font-weight:750;color:#67cfff;text-transform:uppercase}"
@@ -96,7 +96,7 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         "@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}"
         "</style></head><body>"
         "<div class='wrap'><main>"
-        "<div class='brand'><span class='mark'>CL</span><span class='brand-copy'>"
+        "<div class='brand'><img class='brand-logo' src='/cl_bb_manager_static/cl-impianti-logo.svg?v=0.5.0-alpha.4' alt='CL Impianti'><span class='brand-copy'>"
         "<strong>CL CONTROL</strong><small>HOSPITALITY · ACCESSI</small></span></div>"
         "<p class='eyebrow'>Accesso alla struttura</p>"
         f"<h1>{name}</h1><p class='description'>{info}</p>"
@@ -116,7 +116,7 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
             "X-Frame-Options": "DENY",
             "Content-Security-Policy":
                 "default-src 'none'; style-src 'unsafe-inline';"
-                " form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+                " img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
         },
     )
 

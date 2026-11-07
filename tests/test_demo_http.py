@@ -304,3 +304,15 @@ def test_csrf_is_required_even_for_android_opaque_origin():
         assert "Sessione non valida" in result.text
         assert not hass.calls
     asyncio.run(run())
+
+
+def test_official_logo_on_guest_page_uses_local_asset_and_safe_csp():
+    response = demo_http._response(
+        "Strada", "Inserisci il codice di accesso.", form_csrf="a" * 43,
+    )
+    assert response.status == 200
+    assert "src='/cl_bb_manager_static/cl-impianti-logo.svg?v=0.5.0-alpha.4'" in response.text
+    assert "alt='CL Impianti'" in response.text
+    assert "img-src 'self'" in response.headers["Content-Security-Policy"]
+    assert "name='form_csrf'" in response.text
+    assert "form-action 'self'" in response.headers["Content-Security-Policy"]
