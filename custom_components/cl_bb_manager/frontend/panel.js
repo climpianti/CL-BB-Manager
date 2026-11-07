@@ -87,7 +87,7 @@ class ClBbManagerPanel extends HTMLElement {
    ]);
    const gates=this.data.gates.filter(g=>g.enabled && g.action==="script.turn_on" && demoScripts.has(g.entity_id));
    if(!gates.length){
-     card.append(this.node("p","Nessun varco virtuale demo abilitato.","notice"));
+     card.append(this.node("p","Nessun varco di accesso abilitato.","notice"));
      grid.append(card);return;
    }
    const form=this.node("form");
@@ -170,7 +170,7 @@ class ClBbManagerPanel extends HTMLElement {
        this.publicQR={
          ...result,
          expires:Date.now()+result.expires_seconds*1000,
-         gate:gates.find(g=>g.id===values.get("gate_id"))?.name||"Varco demo"
+         gate:gates.find(g=>g.id===values.get("gate_id"))?.name||"Varco"
        };
      }catch(err){
        this.publicQR=null;
@@ -228,7 +228,7 @@ class ClBbManagerPanel extends HTMLElement {
        this.demoQR={
          ...result,
          expires:Date.now()+result.expires_seconds*1000,
-         gate:gates.find(g=>g.id===values.get("gate_id"))?.name||"Varco demo"
+         gate:gates.find(g=>g.id===values.get("gate_id"))?.name||"Varco"
        };
      }catch(err){
        this.demoQR=null;
@@ -249,7 +249,7 @@ class ClBbManagerPanel extends HTMLElement {
        img.alt="QR temporaneo per "+this.demoQR.gate;
        preview.append(img);
        preview.append(this.node("p","Apri il QR su un dispositivo collegato alla stessa rete locale.","small"));
-       const link=this.node("a","Apri il collegamento di prova");
+       const link=this.node("a","Apri pagina di accesso");
        link.href=this.demoQR.url;
        link.target="_blank";
        link.rel="noreferrer noopener";
@@ -261,9 +261,9 @@ class ClBbManagerPanel extends HTMLElement {
      }
    }
    if(this.qrMode==="lan")grid.append(qrCard);
-   const info=this.card("Sicurezza e configurazione");
+   const info=this.card("Informazioni di servizio");
    info.append(this.node("p","Portale permanente: disattivato","small"),
-               this.node("p","Target consentiti: cinque script virtuali demo","small"),
+               this.node("p","Collegamenti autorizzati: soltanto script virtuali","small"),
                this.node("p","Comandi verso serrature fisiche: disattivati","small"));
    grid.append(info);
  }
