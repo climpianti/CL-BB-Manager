@@ -74,11 +74,11 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         "label{font-size:13px;color:#d9ebf7;font-weight:690}"
         "input{width:100%;height:57px;border:1px solid #5b9dc2;"
         "border-radius:13px;background:#061b30c9;color:#fff;padding:12px 16px;"
-        "font:700 23px/1.3 inherit;letter-spacing:.22em;text-align:center}"
+        "font-size:23px;font-weight:700;line-height:1.3;font-family:inherit;letter-spacing:.22em;text-align:center}"
         "input::placeholder{color:#729bb4}input:focus-visible,button:focus-visible{outline:2px solid #19baff;outline-offset:3px}"
         "button{border:1px solid #5ed8ff7d;border-radius:13px;"
         "background:linear-gradient(120deg,#1bb5ed,#1379b6);color:white;"
-        "font:700 16px/1.4 inherit;padding:16px 20px;cursor:pointer;"
+        "font-size:16px;font-weight:700;line-height:1.4;font-family:inherit;padding:16px 20px;cursor:pointer;"
         "display:flex;align-items:center;justify-content:space-between;gap:14px;"
         "box-shadow:0 9px 25px #19baff35}"
         "button:hover{background:linear-gradient(120deg,#36c8fb,#158bca)}"
@@ -148,7 +148,7 @@ class DemoPortalView(HomeAssistantView):
     async def get(self, request, token):
         _, _, session, gate = _session_and_gate(request, token)
         return _response(
-            gate["name"], "Inserisci un PIN valido per provare il varco virtuale.",
+            gate["name"], "Inserisci il codice di accesso ricevuto per continuare.",
             form_csrf=session["form_csrf"],
         )
 
@@ -176,7 +176,7 @@ class DemoPortalView(HomeAssistantView):
             or not secrets.compare_digest(supplied_csrf, expected_csrf)
         ):
             return _response(
-                gate["name"], "Sessione del modulo non valida. Riapri il QR.",
+                gate["name"], "Sessione non valida. Apri nuovamente il QR.",
                 403, form_csrf=expected_csrf if isinstance(expected_csrf, str) else "",
             )
 
@@ -190,7 +190,7 @@ class DemoPortalView(HomeAssistantView):
                 manager.audit("demo_qr_origin_rejected", gate["id"])
                 await manager.async_save()
             return _response(
-                gate["name"], "Origine non autorizzata. Riapri il QR sulla LAN.",
+                gate["name"], "Richiesta non autorizzata. Apri nuovamente il QR.",
                 403, form_csrf=session["form_csrf"],
             )
 
@@ -220,7 +220,7 @@ class DemoPortalView(HomeAssistantView):
             if not (len(pin) == 8 and pin.isascii() and pin.isdecimal()):
                 manager.audit("demo_qr_denied", gate["id"])
                 await manager.async_save()
-                return _response(gate["name"], "PIN non valido o scaduto.", 403, form_csrf=session["form_csrf"])
+                return _response(gate["name"], "Codice non valido o scaduto.", 403, form_csrf=session["form_csrf"])
 
             try:
                 candidates = candidate_bookings(manager.data["bookings"], gate["id"])
@@ -235,7 +235,7 @@ class DemoPortalView(HomeAssistantView):
             if not verified:
                 manager.audit("demo_qr_denied", gate["id"])
                 await manager.async_save()
-                return _response(gate["name"], "PIN non valido o scaduto.", 403, form_csrf=session["form_csrf"])
+                return _response(gate["name"], "Codice non valido o scaduto.", 403, form_csrf=session["form_csrf"])
 
             if hass.states.get(gate["entity_id"]) is None:
                 raise web.HTTPServiceUnavailable()
@@ -250,4 +250,4 @@ class DemoPortalView(HomeAssistantView):
             manager.audit("demo_qr_open", gate["id"])
             await manager.async_save()
 
-        return _response(gate["name"], "Apertura virtuale inviata correttamente.", complete=True)
+        return _response(gate["name"], "Accesso autorizzato.", complete=True)
