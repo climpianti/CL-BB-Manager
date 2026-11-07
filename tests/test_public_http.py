@@ -56,6 +56,12 @@ def test_public_portal_one_success_then_token_invalid():
         with pytest.raises(web.HTTPNotFound):
             await view.post(request, token)
         assert "12345678" not in str(manager.data["events"])
+        record=manager.data["access_history"][-1]
+        assert record["source"]=="https"
+        assert record["result"]=="authorized"
+        assert record["room"]=="Camera 1"
+        assert record["booking_id"]==manager.data["bookings"][0]["id"]
+        assert "12345678" not in str(record)
     asyncio.run(run())
 
 
