@@ -1,6 +1,6 @@
 # CL B&B Manager
 
-**Versione 0.4.0-alpha.1 — dimostrazione QR temporanea su rete LAN. Non per strutture in produzione.**
+**Versione 0.4.0-alpha.4 — collaudo QR/PIN virtuale su rete LAN. Non per accessi reali in produzione.**
 
 Integrazione custom per Home Assistant, progettata da CL Impianti per la gestione di varchi, camere e prenotazioni nei B&B.
 
@@ -9,7 +9,7 @@ Integrazione custom per Home Assistant, progettata da CL Impianti per la gestion
 - **Pannello amministrativo** in Home Assistant, sezioni *Varchi*, *Prenotazioni*, *Registro* e *Collaudo accessi*.
 - **Varchi dinamici**: aggiungi, configura, modifica e disabilita varchi comuni o privati; fino a 200 in questa alpha.
 - **Prenotazioni con PIN** numerico di 8 cifre: check-in, check-out, elenco di varchi autorizzati, revoca immediata e PIN salvato soltanto come hash salato.
-- **QR permanenti scaricabili** da un amministratore, ma la loro destinazione pubblica è ancora *spenta*. Non usarli sugli accessi di clienti reali.
+- **QR permanenti /guest/** non attivi. Nel pannello Varchi si accede ora alla generazione di un **QR prova (LAN)** temporaneo; non consegnare QR agli ospiti reali.
 - **QR di prova temporaneo (10 minuti)**, generato dall'amministratore per uno dei cinque varchi **virtuali** della demo e utilizzabile da smartphone collegato alla **stessa rete LAN** di Home Assistant, senza account HA.
 - **Portale di prova** con PIN di prenotazione, controllo su permessi, data, revoca, limiti di tentativi persistenti, registro delle azioni e comando esclusivamente virtuale.
 
@@ -26,9 +26,19 @@ Integrazione custom per Home Assistant, progettata da CL Impianti per la gestion
 
 Gli script virtuali previsti sono `script.cl_bb_demo_apri_cancello`, `script.cl_bb_demo_apri_portone`, `script.cl_bb_demo_apri_camera_1`, `script.cl_bb_demo_apri_camera_2` e `script.cl_bb_demo_apri_camera_3`, ciascuno collegato esclusivamente a un `input_boolean` dimostrativo.
 
-## Installazione
+## Installazione tramite Home Assistant Marketplace / HACS (pilot)
 
-Copia `custom_components/cl_bb_manager/` in `/config/custom_components/cl_bb_manager/`, verifica la configurazione e riavvia Home Assistant. Configura l'integrazione da **Impostazioni → Dispositivi e servizi → Aggiungi integrazione → CL B&B Manager**. Non creare una seconda istanza se è già configurata.
+1. Aggiungi il repository GitHub pubblico `climpianti/CL-BB-Manager` come **repository personalizzato** di categoria **Integrazione** nel Marketplace/HACS. Il repository deve essere pubblico, oppure l'account GitHub connesso a HACS deve essere autorizzato a leggere il repository privato.
+2. Cerca **CL B&B Manager** tra le integrazioni personalizzate e installa la revisione `0.4.0-alpha.4`. Verifica la versione nell'apposito `manifest.json` prima di usare il componente.
+3. Prima di installare su un'istanza con altri sistemi attivi, salva e verifica un backup completo Home Assistant. Per attivare il componente occorre un riavvio di Home Assistant.
+4. In Home Assistant apri **Impostazioni → Dispositivi e servizi → Aggiungi integrazione → CL B&B Manager** e crea un'unica istanza; non duplicare una configurazione già presente.
+5. Per il collaudo usa soltanto script `script.cl_bb_demo_apri_*` verificati, collegati esclusivamente a helper `input_boolean` virtuali. Non collegare attuatori fisici.
+
+Il Marketplace di Home Assistant 2026.11 può richiedere prima l'accettazione dell'avviso iniziale e la connessione dell'account GitHub. Per il piano Covone vedere [PILOT-COVONE.md](docs/PILOT-COVONE.md) sul [branch pilota](https://github.com/climpianti/CL-BB-Manager/tree/pilot/bb-covone-alpha4). In assenza di un rilascio stabile, la selezione della versione può corrispondere al branch principale; verificare sempre `manifest.json`.
+
+**Alternativa manuale:** copia `custom_components/cl_bb_manager/` in `/config/custom_components/cl_bb_manager/`, valida la configurazione, riavvia e aggiungi l'integrazione dall'interfaccia.
+
+**Pubblicare questo repository su GitHub non attiva il portale pubblico**: il percorso `/guest/` resta disattivato e il QR `/demo/` è utilizzabile solo sulla LAN.
 
 ## Limiti importanti
 
