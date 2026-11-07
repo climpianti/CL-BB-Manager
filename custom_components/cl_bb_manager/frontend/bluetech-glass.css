@@ -111,3 +111,11 @@ a:hover{color:#c5f0ff}
  button{transition:none}
  button:hover:not(:disabled){transform:none}
 }
+
+/* Dashboard actions: clear, consistent spacing on phones and tablets. */
+.dashboard-actions{display:flex;flex-wrap:wrap;align-items:stretch;gap:12px;margin-top:22px}
+.dashboard-actions button{margin:0;flex:0 1 auto;min-width:0}
+@media(max-width:740px){
+ .dashboard-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-top:24px}
+ .dashboard-actions button{width:100%;min-height:52px;white-space:normal}
+}
