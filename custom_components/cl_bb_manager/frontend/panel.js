@@ -46,8 +46,10 @@ class ClBbManagerPanel extends HTMLElement {
    grid.append(metrics);
    const welcome=this.card("Benvenuto in CL Control Hospitality");
    welcome.append(this.node("p","Gestisci i permessi, crea i codici di accesso e genera i QR temporanei dalla sezione Accessi."));
-   welcome.append(this.button("Gestisci accessi",()=>{this.tab="accessi";this.render();}));
-   welcome.append(this.button("Nuova prenotazione",()=>{this.tab="prenotazioni";this.render();}));
+   const actions=this.node("div","","dashboard-actions");
+   actions.append(this.button("Gestisci accessi",()=>{this.tab="accessi";this.render();}));
+   actions.append(this.button("Nuova prenotazione",()=>{this.tab="prenotazioni";this.render();}));
+   welcome.append(actions);
    grid.append(welcome);
    const status=this.card("Stato dei servizi");
    status.append(this.node("p","QR HTTPS temporanei: "+(this.data.public_pilot==="enabled"?"Abilitati":"Disabilitati")));
