@@ -133,7 +133,7 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
         if self._manager() is None:
             return self.async_abort(reason="not_ready")
         return self.async_show_menu(
-            step_id="gates", menu_options=["add_gate", "remove_gate"]
+            step_id="gates", menu_options=["add_gate", "edit_gate", "remove_gate"]
         )
 
     async def async_step_add_gate(self, user_input=None):
@@ -185,6 +185,133 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
                 ]),
             }),
             errors=errors,
+        )
+
+    async def async_step_edit_gate(self, user_input=None):
+        """Select an existing gate; do not change it until the next form is saved."""
+        manager = self._manager()
+        if manager is None:
+            return self.async_abort(reason="not_ready")
+        async with manager.lock:
+            gates = list(manager.data["gates"])
+        if not gates:
+            return self.async_abort(reason="no_gates")
+        errors = {}
+        if user_input is not None:
+            gate_id = user_input.get("gate_id", "")
+            if any(gate["id"] == gate_id for gate in gates):
+                self._gate_id_to_edit = gate_id
+                return await self.async_step_edit_gate_details()
+            errors["base"] = "invalid_gate"
+
+        return self.async_show_form(
+            step_id="edit_gate",
+            data_schema=vol.Schema({
+                vol.Required("gate_id"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(
+                                value=gate["id"],
+                                label=gate["name"] + " · " + gate["entity_id"],
+                            )
+                            for gate in gates
+                        ],
+                        multiple=False,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                )
+            }),
+            errors=errors,
+        )
+
+    async def async_step_edit_gate_details(self, user_input=None):
+        """Edit a gate while preserving bookings and avoiding actuator changes."""
+        manager = self._manager()
+        if manager is None:
+            return self.async_abort(reason="not_ready")
+        gate_id = getattr(self, "_gate_id_to_edit", None)
+        if not gate_id:
+            return self.async_abort(reason="invalid_gate")
+        errors = {}
+        async with manager.lock:
+            gate = next(
+                (item for item in manager.data["gates"] if item["id"] == gate_id),
+                None,
+            )
+            if gate is None:
+                return self.async_abort(reason="invalid_gate")
+            defaults = {
+                key: gate[key] for key in ("name", "entity_id", "action", "kind")
+            }
+
+        if user_input is not None:
+            try:
+                candidate = make_gate(
+                    user_input["name"], user_input["entity_id"],
+                    user_input["action"], user_input["kind"], enabled=False,
+                )
+                if self.hass.states.get(candidate["entity_id"]) is None:
+                    raise ValueError("Entità Home Assistant non trovata.")
+                async with manager.lock:
+                    current = next(
+                        (item for item in manager.data["gates"] if item["id"] == gate_id),
+                        None,
+                    )
+                    if current is None:
+                        return self.async_abort(reason="invalid_gate")
+                    if any(
+                        item["id"] != gate_id
+                        and item["entity_id"] == candidate["entity_id"]
+                        for item in manager.data["gates"]
+                    ):
+                        raise ValueError("Entità già associata a un altro varco.")
+                    sensitive_change = any(
+                        current[key] != candidate[key]
+                        for key in ("entity_id", "action", "kind")
+                    )
+                    if sensitive_change:
+                        # Do not silently change any active booking's door rights.
+                        check_gate_removal(gate_id, manager.data["bookings"])
+                    for key in ("name", "entity_id", "action", "kind"):
+                        current[key] = candidate[key]
+                    if sensitive_change:
+                        # Require deliberate re-enabling and invalidate old QR links.
+                        current["enabled"] = False
+                        current["token"] = candidate["token"]
+                        manager.demo_sessions.clear()
+                        manager.public_demo_sessions.clear()
+                    manager.audit("gate_updated", current["name"])
+                    await manager.async_save()
+            except (KeyError, TypeError, ValueError) as err:
+                errors["base"] = (
+                    "gate_has_bookings" if "Revocare" in str(err)
+                    else "invalid_gate"
+                )
+            else:
+                return self.async_create_entry(
+                    title="", data=self._unchanged_options()
+                )
+
+        return self.async_show_form(
+            step_id="edit_gate_details",
+            data_schema=vol.Schema({
+                vol.Required("name", default=defaults["name"]): str,
+                vol.Required(
+                    "entity_id", default=defaults["entity_id"]
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["script", "button", "lock"], multiple=False
+                    )
+                ),
+                vol.Required(
+                    "action", default=defaults["action"]
+                ): vol.In(["script.turn_on", "button.press", "lock.unlock"]),
+                vol.Required("kind", default=defaults["kind"]): vol.In(
+                    ["shared", "private"]
+                ),
+            }),
+            errors=errors,
+            description_placeholders={"gate_name": defaults["name"]},
         )
 
     async def async_step_remove_gate(self, user_input=None):

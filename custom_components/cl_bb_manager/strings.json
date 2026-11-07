@@ -19,13 +19,13 @@
         "title": "Impostazioni CL B&B Manager",
         "description": "Gestisci le autorizzazioni degli operatori e configura i varchi della struttura. Le modifiche ai varchi sono riservate agli amministratori.",
         "menu_options": {
-          "access": "Accesso HTTPS e operatori",
+          "access": "Modifica operatori e accesso HTTPS",
           "gates": "Gestione varchi"
         }
       },
       "access": {
         "title": "Accesso HTTPS e operatori",
-        "description": "Operatori attualmente salvati: {current_operators}. Solo gli utenti Home Assistant attivi e non amministratori devono essere selezionati qui; gli amministratori hanno già accesso completo. I QR restano limitati ai varchi virtuali.",
+        "description": "Operatori attualmente salvati: {current_operators}. Puoi aggiungere o rimuovere gli utenti selezionati, quindi salvare. Gli amministratori hanno gia accesso completo. I QR restano limitati ai varchi virtuali.",
         "data": {
           "public_pilot_enabled": "Abilita accesso temporaneo HTTPS",
           "public_pilot_origin": "Indirizzo pubblico HTTPS (automatico da Home Assistant)",
@@ -34,10 +34,11 @@
       },
       "gates": {
         "title": "Gestione varchi",
-        "description": "Aggiungi o elimina un varco dalla configurazione. I varchi nuovi saranno inattivi finché non verranno abilitati nel pannello.",
+        "description": "Aggiungi, modifica oppure elimina i varchi. Le modifiche a entita, azione o tipologia sono bloccate se il varco e associato a prenotazioni ancora valide; quando consentite, disattivano il varco per una nuova verifica.",
         "menu_options": {
           "add_gate": "Aggiungi varco",
-          "remove_gate": "Elimina varco"
+          "remove_gate": "Elimina varco",
+          "edit_gate": "Modifica varco esistente"
         }
       },
       "add_gate": {
@@ -62,6 +63,23 @@
         "description": "Vuoi davvero eliminare il varco «{gate_name}»? Questa operazione ne rimuoverà la configurazione dal gestionale, senza cancellare o eseguire le entità Home Assistant. Se non sei sicuro, torna indietro senza confermare.",
         "data": {
           "confirm": "Confermo l'eliminazione del varco"
+        }
+      },
+      "edit_gate": {
+        "title": "Seleziona varco da modificare",
+        "description": "Scegli il varco da aggiornare, senza eliminare il collegamento alle prenotazioni.",
+        "data": {
+          "gate_id": "Varco da modificare"
+        }
+      },
+      "edit_gate_details": {
+        "title": "Modifica varco - {gate_name}",
+        "description": "Il nome puo essere aggiornato senza interrompere le prenotazioni. Cambiare entita, azione o tipo richiede l'assenza di prenotazioni ancora valide e lascia il varco disattivato per sicurezza. Nessun comando verra inviato ai dispositivi.",
+        "data": {
+          "name": "Nome del varco",
+          "entity_id": "Entita Home Assistant",
+          "action": "Azione",
+          "kind": "Tipo di varco"
         }
       }
     },
