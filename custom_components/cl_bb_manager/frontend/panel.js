@@ -26,6 +26,7 @@ class ClBbManagerPanel extends HTMLElement {
  if(this.error)page.append(this.node("div",this.error,"notice"));
  if(this.pin){const box=this.node("div","Codice di accesso generato · visibile una sola volta: "+this.pin+" ","notice");box.append(this.button("Copia codice",()=>navigator.clipboard?.writeText(this.pin)));page.append(box);}
  if(!this.data)return;const nav=this.node("nav","","nav");for(const [id,label] of [["dashboard","Panoramica"],["prenotazioni","Prenotazioni"],["accessi","Accessi"],["varchi","Varchi"],["registro","Registro"],["impostazioni","Impostazioni"]]){
+   if(this.data.role!=="admin" && ["varchi","registro","impostazioni"].includes(id))continue;
    const b=this.button(label,()=>{this.tab=id;this.pin="";this.render();});
    if(this.tab===id)b.classList.add("active");
    nav.append(b);
@@ -45,7 +46,9 @@ class ClBbManagerPanel extends HTMLElement {
    }
    grid.append(metrics);
    const welcome=this.card("Benvenuto in CL Control Hospitality");
-   welcome.append(this.node("p","Gestisci i permessi, crea i codici di accesso e genera i QR temporanei dalla sezione Accessi."));
+   welcome.append(this.node("p",this.data.role==="admin"
+     ?"Gestisci varchi e permessi, crea i codici di accesso e genera i QR temporanei."
+     :"Crea prenotazioni con codici temporanei e genera QR dalla sezione Accessi."));
    const actions=this.node("div","","dashboard-actions");
    actions.append(this.button("Gestisci accessi",()=>{this.tab="accessi";this.render();}));
    actions.append(this.button("Nuova prenotazione",()=>{this.tab="prenotazioni";this.render();}));
@@ -87,11 +90,12 @@ class ClBbManagerPanel extends HTMLElement {
      "script.cl_bb_demo_apri_camera_1","script.cl_bb_demo_apri_camera_2",
      "script.cl_bb_demo_apri_camera_3"
    ]);
-   const gates=this.data.gates.filter(g=>g.enabled && g.action==="script.turn_on" && demoScripts.has(g.entity_id));
+   const gates=this.data.gates.filter(g=>g.demo_allowed===true);
    if(!gates.length){
      card.append(this.node("p","Nessun varco di accesso abilitato.","notice"));
      grid.append(card);return;
    }
+   if(this.data.role==="admin"){
    const form=this.node("form");
    this.select(form,"Varco da verificare","gate_id",gates.map(g=>[g.id,g.name]),this.demoTargetGateId||gates[0].id);
    const pinInput=this.field(form,"Codice di accesso · 8 cifre","pin","password");
@@ -135,6 +139,9 @@ class ClBbManagerPanel extends HTMLElement {
      card.append(outcome);
    }
    card.append(this.node("p","I tentativi sono limitati e registrati; il codice non viene memorizzato nel browser. Nessun attuatore fisico viene comandato.","small"));
+   }else{
+     card.append(this.node("p","Puoi generare QR temporanei. La simulazione dei comandi sui varchi resta riservata agli amministratori.","small"));
+   }
    grid.append(card);
    const modeCard=this.card("Connessione");
    modeCard.append(this.node("p","Per accedere da Internet viene utilizzato l'URL esterno configurato in Home Assistant. Seleziona la rete locale solo per accessi dalla stessa Wi-Fi.","small"));
