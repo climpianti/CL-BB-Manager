@@ -84,3 +84,12 @@ def test_role_loveless_panel_is_not_admin_only():
     assert 'sidebar_title=None' in source
     assert 'require_admin=False' in source
     assert 'role=user_role(connection.user, manager.entry.options)' in (ROOT / "api.py").read_text(encoding="utf-8")
+
+
+def test_panel_does_not_hijack_ha_configure_button():
+    panel = (ROOT / "__init__.py").read_text(encoding="utf-8")
+    options = (ROOT / "config_flow.py").read_text(encoding="utf-8")
+    assert "config_panel_domain=" not in panel
+    assert "require_admin=False" in panel
+    assert "async_get_options_flow" in options
+    assert "operator_user_ids" in options or "OPTION_OPERATOR_USERS" in options
