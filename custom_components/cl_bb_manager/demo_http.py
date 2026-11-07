@@ -12,13 +12,13 @@ from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 
 from .const import DOMAIN
-from .demo_policy import is_lan_peer, valid_demo_session
+from .demo_policy import is_lan_peer, valid_demo_session, valid_form_origin
 from .guest import DEMO_SCRIPTS
 from .models import pin_matches
 from .security import candidate_bookings, charge_attempt, demo_target_allowed
 
 
-def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf: str = "") -> web.Response:
+def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf: str = "", complete: bool = False) -> web.Response:
     name = escape(gate_name, quote=True)
     info = escape(message, quote=True)
     document = (
@@ -43,13 +43,18 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         "</style></head><body><main>"
         "<div class='tag'>CL B&B MANAGER · DEMO LOCALE</div>"
         f"<h1>{name}</h1><p>{info}</p>"
-        "<form method='post' autocomplete='off'>"
-        f"<input type='hidden' name='form_csrf' value='{escape(form_csrf, quote=True)}'>"
-        "<label for='pin'>PIN della prenotazione</label>"
-        "<input id='pin' name='pin' type='password' inputmode='numeric'"
-        " minlength='8' maxlength='8' pattern='[0-9]{8}'"
-        " autocomplete='off' required>"
-        "<button type='submit'>Simula apertura</button></form>"
+        (
+            "<p role='status'>✓ Comando virtuale inviato. Puoi chiudere questa pagina.</p>"
+            if complete else (
+                "<form method='post' autocomplete='off'>"
+                f"<input type='hidden' name='form_csrf' value='{escape(form_csrf, quote=True)}'>"
+                "<label for='pin'>PIN della prenotazione</label>"
+                "<input id='pin' name='pin' type='password' inputmode='numeric'"
+                " minlength='8' maxlength='8' pattern='[0-9]{8}'"
+                " autocomplete='off' required>"
+                "<button type='submit'>Simula apertura</button></form>"
+            )
+        )
         "<small>Sessione temporanea. Nessuna porta reale viene comandata.</small>"
         "</main></body></html>"
     )
@@ -101,19 +106,6 @@ class DemoPortalView(HomeAssistantView):
 
     async def post(self, request, token):
         hass, manager, session, gate = _session_and_gate(request, token)
-        # Some mobile form submissions legitimately omit Origin. Cross-origin
-        # submissions still fail closed, and EVERY POST needs the session-bound
-        # hidden CSRF value issued by the GET response.
-        supplied_origin = request.headers.get("Origin")
-        fetch_site = request.headers.get("Sec-Fetch-Site")
-        if (
-            (supplied_origin is not None and supplied_origin.lower() != session["origin"])
-            or fetch_site == "cross-site"
-        ):
-            return _response(
-                gate["name"], "Origine non autorizzata. Riapri il QR sulla LAN.",
-                403, form_csrf=session["form_csrf"],
-            )
         if (
             request.content_length is None
             or request.content_length > 256
@@ -138,6 +130,20 @@ class DemoPortalView(HomeAssistantView):
             return _response(
                 gate["name"], "Sessione del modulo non valida. Riapri il QR.",
                 403, form_csrf=expected_csrf if isinstance(expected_csrf, str) else "",
+            )
+
+        supplied_origin = request.headers.get("Origin")
+        fetch_site = request.headers.get("Sec-Fetch-Site")
+        if not valid_form_origin(
+            supplied_origin, fetch_site, session["origin"]
+        ):
+            # Audit only a rejection category, never the PIN, QR URL or token.
+            async with manager.lock:
+                manager.audit("demo_qr_origin_rejected", gate["id"])
+                await manager.async_save()
+            return _response(
+                gate["name"], "Origine non autorizzata. Riapri il QR sulla LAN.",
+                403, form_csrf=session["form_csrf"],
             )
 
         async with manager.lock:
@@ -196,4 +202,4 @@ class DemoPortalView(HomeAssistantView):
             manager.audit("demo_qr_open", gate["id"])
             await manager.async_save()
 
-        return _response(gate["name"], "Apertura virtuale inviata correttamente.", form_csrf=session["form_csrf"])
+        return _response(gate["name"], "Apertura virtuale inviata correttamente.", complete=True)
