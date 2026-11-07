@@ -12,7 +12,7 @@ class ClBbManagerPanel extends HTMLElement {
  select(form,label,name,options,selected){const wrap=this.node("label",label);const s=this.node("select");s.name=name;for(const [v,t] of options){const o=this.node("option",t);o.value=v;o.selected=v===selected;s.append(o);}wrap.append(s);form.append(wrap);}
  card(title){const a=this.node("section","","card");a.append(this.node("h2",title));return a;}
  render(){const root=this.shadowRoot;root.replaceChildren();const style=this.node("style");
- style.textContent="@import url('/cl_bb_manager_static/bluetech-glass.css?v=0.5.0-alpha.5');";root.append(style);
+ style.textContent="@import url('/cl_bb_manager_static/bluetech-glass.css?v=0.5.0-alpha.6');";root.append(style);
  const page=this.node("main","","page");root.append(page);const hero=this.node("header","","hero");
  const brand=this.node("div","","hero-brand");
  const logo=this.node("img");logo.src="/cl_bb_manager_static/cl-impianti-logo.svg?v=0.5.0-alpha.5";logo.alt="CL Impianti";logo.className="brand-logo";logo.decoding="async";brand.append(logo);
