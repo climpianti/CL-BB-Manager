@@ -17,15 +17,17 @@
     "step": {
       "init": {
         "title": "Accesso temporaneo HTTPS",
-        "description": "Configura il collegamento HTTPS per i codici QR temporanei. L'URL esterno viene letto dalle impostazioni di rete di Home Assistant. Modalità pilota: sono consentiti solo varchi virtuali; non abilita il portale permanente.",
+        "description": "Seleziona gli utenti Home Assistant che possono gestire prenotazioni, PIN e QR temporanei, senza modificare i varchi. Gli amministratori mantengono accesso completo. I QR sono ancora limitati ai varchi virtuali di collaudo.",
         "data": {
           "public_pilot_enabled": "Abilita accesso temporaneo HTTPS",
-          "public_pilot_origin": "Indirizzo pubblico HTTPS (automatico da Home Assistant)"
+          "public_pilot_origin": "Indirizzo pubblico HTTPS (automatico da Home Assistant)",
+          "operator_user_ids": "Operatori B&B autorizzati"
         }
       }
     },
     "error": {
-      "invalid_public_origin": "Il dominio deve essere un URL HTTPS valido senza porta o percorso."
+      "invalid_public_origin": "Il dominio deve essere un URL HTTPS valido senza porta o percorso.",
+      "invalid_operator_users": "Seleziona solo account Home Assistant attivi, non amministratori, fino a 20 utenti."
     }
   }
 }
