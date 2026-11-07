@@ -35,7 +35,7 @@ test("Il form verifica la selezione del varco prima di generare il PIN", () => {
 test("I varchi non propongono QR permanenti disattivati", () => {
   assert.ok(source.includes("QR di accesso"));
   assert.ok(!source.includes('this.button("Scarica QR"'));
-  assert.ok(source.includes('this.tab="collaudo"'));
+  assert.ok(source.includes('this.tab="accessi"'));
   assert.ok(source.includes('this.demoTargetGateId=gate.id'));
   assert.ok(source.includes("L\u0027accesso permanente non è ancora disponibile."));
 });
@@ -60,4 +60,15 @@ test("CL Control BlueTech Glass conserva navigazione e stati di collaudo", () =>
   assert.ok(source.includes('"Genera QR di accesso"'));
   assert.ok(source.includes('Ambiente pilota · solo varchi virtuali'));
   assert.ok(!source.includes('this.button("Scarica QR"'));
+});
+
+
+test("BlueTech Glass usa i colori ufficiali CL Control e layout responsive", () => {
+  const css=readFileSync("custom_components/cl_bb_manager/frontend/bluetech-glass.css","utf8");
+  assert.ok(css.includes("#061324"));
+  assert.ok(css.includes("#19baff"));
+  assert.ok(css.includes("#32e394"));
+  assert.ok(css.includes("backdrop-filter:blur"));
+  assert.ok(css.includes("@media(max-width:740px)"));
+  assert.ok(css.includes(":focus-visible"));
 });
