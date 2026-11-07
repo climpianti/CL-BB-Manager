@@ -12,6 +12,7 @@ from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 
 from .const import DOMAIN
+from .access_history import add_access_event
 from .demo_policy import is_lan_peer, valid_demo_session, valid_form_origin
 from .guest import DEMO_SCRIPTS
 from .models import pin_matches
@@ -219,6 +220,7 @@ class DemoPortalView(HomeAssistantView):
 
             if not (len(pin) == 8 and pin.isascii() and pin.isdecimal()):
                 manager.audit("demo_qr_denied", gate["id"])
+                add_access_event(manager.data, source="lan", result="denied", gate=gate)
                 await manager.async_save()
                 return _response(gate["name"], "Codice non valido o scaduto.", 403, form_csrf=session["form_csrf"])
 
@@ -227,13 +229,14 @@ class DemoPortalView(HomeAssistantView):
             except ValueError as exc:
                 raise web.HTTPServiceUnavailable() from exc
 
-            verified = False
+            matched_booking = None
             for booking in candidates:
                 if await hass.async_add_executor_job(pin_matches, pin, booking):
-                    verified = True
+                    matched_booking = booking
                     break
-            if not verified:
+            if matched_booking is None:
                 manager.audit("demo_qr_denied", gate["id"])
+                add_access_event(manager.data, source="lan", result="denied", gate=gate)
                 await manager.async_save()
                 return _response(gate["name"], "Codice non valido o scaduto.", 403, form_csrf=session["form_csrf"])
 
@@ -248,6 +251,10 @@ class DemoPortalView(HomeAssistantView):
             except Exception as exc:
                 raise web.HTTPServiceUnavailable() from exc
             manager.audit("demo_qr_open", gate["id"])
+            add_access_event(
+                manager.data, source="lan", result="authorized",
+                gate=gate, booking=matched_booking,
+            )
             await manager.async_save()
 
         return _response(gate["name"], "Accesso autorizzato.", complete=True)
