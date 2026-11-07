@@ -392,7 +392,66 @@ def register_commands(hass):
         except (ValueError, TypeError) as err:
             _error(connection, msg, err)
 
+
+    @websocket_api.websocket_command({
+        "type": "cl_bb_manager/public_pilot_qr",
+        vol.Required("gate_id"): str,
+    })
+    @websocket_api.async_response
+    async def public_pilot_qr(hass, connection, msg):
+        """Admin-only one-use HTTPS QR for a verified, allowlisted virtual script."""
+        import time
+        from io import BytesIO
+        import segno
+        from .guest import DEMO_SCRIPTS
+        from .public_policy import (
+            MAX_PUBLIC_SESSIONS, create_public_session, validate_public_origin
+        )
+
+        manager = _authorize(hass, connection, msg)
+        if manager is None:
+            return
+        try:
+            if not manager.entry.options.get("public_pilot_enabled", False):
+                raise ValueError("Abilitare prima il collaudo HTTPS nelle opzioni.")
+            origin = validate_public_origin(
+                manager.entry.options.get("public_pilot_origin", "")
+            )
+            gate = next(
+                (g for g in manager.data["gates"] if g["id"] == msg["gate_id"]),
+                None,
+            )
+            if gate is None or not demo_target_allowed(gate, DEMO_SCRIPTS):
+                raise ValueError("Varco virtuale non autorizzato.")
+            if hass.states.get(gate["entity_id"]) is None:
+                raise ValueError("Script virtuale non disponibile.")
+
+            async with manager.lock:
+                now = time.time()
+                manager.public_demo_sessions = {
+                    key: session
+                    for key, session in manager.public_demo_sessions.items()
+                    if session.get("expires", 0) > now
+                }
+                if len(manager.public_demo_sessions) >= MAX_PUBLIC_SESSIONS:
+                    raise ValueError("Attendere: troppe sessioni HTTPS attive.")
+                token, session = create_public_session(
+                    gate["id"], origin, now=now
+                )
+                url = origin + "/api/cl_bb_manager/public-demo/" + token
+                buffer = BytesIO()
+                segno.make_qr(url).save(buffer, kind="svg", scale=6, border=3)
+                manager.public_demo_sessions[token] = session
+            connection.send_result(msg["id"], {
+                "svg": buffer.getvalue().decode("utf-8"),
+                "url": url,
+                "expires_seconds": 600,
+                "one_time": True,
+            })
+        except (ValueError, TypeError) as err:
+            _error(connection, msg, err)
+
     for handler in (
-        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin, demo_qr
+        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin, demo_qr, public_pilot_qr
     ):
         websocket_api.async_register_command(hass, handler)

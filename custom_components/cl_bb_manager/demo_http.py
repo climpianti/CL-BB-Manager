@@ -53,7 +53,7 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         "button{border:0;background:#1857a5;color:#fff;margin-top:18px}"
         ".tag{color:#527ba9;font-size:13px;font-weight:700;letter-spacing:1px}"
         "</style></head><body><main>"
-        "<div class='tag'>CL B&B MANAGER · DEMO LOCALE</div>"
+        "<div class='tag'>CL B&B MANAGER · DEMO VIRTUALE</div>"
         f"<h1>{name}</h1><p>{info}</p>"
         f"{form_html}"
         "<small>Sessione temporanea. Nessuna porta reale viene comandata.</small>"

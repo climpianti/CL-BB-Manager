@@ -12,5 +12,20 @@
     "abort": {
       "already_configured": "Il gestore B&B è già configurato."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Collaudo HTTPS solo virtuale",
+        "description": "Consenti QR monouso validi 10 minuti, esclusivamente con i cinque script virtuali demo. Imposta il dominio HTTPS di questa struttura. Non abilita il portale permanente.",
+        "data": {
+          "public_pilot_enabled": "Abilita collaudo QR temporaneo via HTTPS",
+          "public_pilot_origin": "Origine pubblica HTTPS (es. https://b-b.esempio.it)"
+        }
+      }
+    },
+    "error": {
+      "invalid_public_origin": "Il dominio deve essere un URL HTTPS valido senza porta o percorso."
+    }
   }
 }

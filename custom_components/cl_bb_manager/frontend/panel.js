@@ -20,7 +20,7 @@ class ClBbManagerPanel extends HTMLElement {
  if(!this.data)return;const nav=this.node("nav","","nav");for(const [id,label] of [["varchi","Varchi"],["prenotazioni","Prenotazioni"],["registro","Registro"],["collaudo","Collaudo accessi"]])nav.append(this.button(label,()=>{this.tab=id;this.pin="";this.render();}));page.append(nav);
  const grid=this.node("div","","grid");page.append(grid);
  if(this.tab==="varchi")this.gates(grid);if(this.tab==="prenotazioni")this.bookings(grid);if(this.tab==="registro")this.events(grid);if(this.tab==="collaudo")this.testAccess(grid);
- page.append(this.node("p","ALPHA 0.4.1 — QR di prova LAN temporanei; i QR /guest/ permanenti sono disattivati.","small"));
+ page.append(this.node("p","ALPHA 0.5.0 — QR LAN e HTTPS temporanei; portale /guest/ permanente disattivato.","small"));
  }
  gates(grid){const list=this.card("Gestione varchi");list.append(this.node("p","I QR permanenti sono disattivati. Usa «QR prova (LAN)» per una sessione temporanea di 10 minuti, senza dominio Cloudflare.","notice"));for(const gate of this.data.gates){const line=this.node("div","","item");line.append(this.node("strong",gate.name),this.node("p",gate.entity_id+" · "+gate.kind+" · "+(gate.enabled?"Abilitato":"Disabilitato"),"small"));line.append(this.button("Modifica",()=>this.edit(gate,grid)));line.append(this.button("QR prova (LAN)",()=>{this.demoTargetGateId=gate.id;this.demoQR=null;this.tab="collaudo";this.render();}));line.append(this.button(gate.enabled?"Disabilita":"Abilita",()=>this.act("update_gate",{gate_id:gate.id,name:gate.name,entity_id:gate.entity_id,action:gate.action,kind:gate.kind,enabled:!gate.enabled})));line.append(this.button("Elimina",()=>{if(confirm("Eliminare "+gate.name+"?"))this.act("remove_gate",{gate_id:gate.id});}));list.append(line);}grid.append(list);
  const card=this.card("Aggiungi varco");const form=this.node("form");this.field(form,"Nome varco","name");this.field(form,"Entità HA","entity_id");this.select(form,"Azione","action",[["script.turn_on","Script"],["button.press","Pulsante"],["lock.unlock","Serratura"]],"script.turn_on");this.select(form,"Tipo","kind",[["private","Privato"],["shared","Comune"]],"private");const send=this.node("button","Salva varco disabilitato");send.type="submit";form.append(send);form.onsubmit=e=>{e.preventDefault();this.act("add_gate",Object.fromEntries(new FormData(form)));};card.append(form);grid.append(card);}
@@ -148,6 +148,60 @@ class ClBbManagerPanel extends HTMLElement {
      }
    }
    grid.append(qrCard);
+   const publicCard=this.card("QR HTTPS temporaneo · 10 minuti / un utilizzo");
+   publicCard.append(this.node("p",
+     "Solo tre varchi virtuali per il collaudo esterno. Abilita prima l'opzione " +
+     "«Collaudo HTTPS» dall'integrazione Home Assistant con il dominio HTTPS " +
+     "autorizzato. Nessun QR permanente viene abilitato.",
+     "small"));
+   const publicForm=this.node("form");
+   this.select(publicForm,"Varco virtuale","gate_id",
+     gates.map(g=>[g.id,g.name]),this.demoTargetGateId||gates[0].id);
+   const makePublic=this.node("button","Genera QR HTTPS di prova");
+   makePublic.type="submit";
+   publicForm.append(makePublic);
+   publicForm.onsubmit=async event=>{
+     event.preventDefault();
+     if(!publicForm.reportValidity() || this.testBusy)return;
+     this.testBusy=true;
+     makePublic.disabled=true;
+     this.error="";
+     try{
+       const values=new FormData(publicForm);
+       const result=await this.api("public_pilot_qr",{
+         gate_id:String(values.get("gate_id"))
+       });
+       this.publicQR={
+         ...result,
+         expires:Date.now()+result.expires_seconds*1000,
+         gate:gates.find(g=>g.id===values.get("gate_id"))?.name||"Varco demo"
+       };
+     }catch(err){
+       this.publicQR=null;
+       this.error=this.describeError(err);
+     }finally{
+       this.testBusy=false;
+       this.render();
+     }
+   };
+   publicCard.append(publicForm);
+   if(this.publicQR && Date.now()<this.publicQR.expires){
+     const preview=this.node("div");
+     const img=this.node("img");
+     img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(this.publicQR.svg);
+     img.width=220;
+     img.height=220;
+     img.alt="QR HTTPS temporaneo per "+this.publicQR.gate;
+     preview.append(img);
+     preview.append(this.node("p","Usa una sola volta, entro 10 minuti. Non condividere il QR pubblicamente.","small"));
+     const link=this.node("a","Apri la prova HTTPS");
+     link.href=this.publicQR.url;
+     link.target="_blank";
+     link.rel="noreferrer noopener";
+     preview.append(link);
+     publicCard.append(preview);
+   }
+   grid.append(publicCard);
    const info=this.card("Stato di sicurezza");
    info.append(this.node("p","Portale QR ospiti: disattivato","small"),
                this.node("p","Target consentiti: cinque script virtuali demo","small"),
