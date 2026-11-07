@@ -39,6 +39,7 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             enabled = bool(user_input.get("public_pilot_enabled", False))
             origin = str(user_input.get("public_pilot_origin", "")).strip()
+            origin = self.hass.config.external_url or origin
             if enabled:
                 try:
                     origin = validate_public_origin(origin)
@@ -57,7 +58,7 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
             ): bool,
             vol.Optional(
                 "public_pilot_origin",
-                default=self.config_entry.options.get("public_pilot_origin", "")
+                default=self.hass.config.external_url or self.config_entry.options.get("public_pilot_origin", "")
             ): str,
         })
         return self.async_show_form(

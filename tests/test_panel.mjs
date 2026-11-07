@@ -33,9 +33,20 @@ test("Il form verifica la selezione del varco prima di generare il PIN", () => {
 });
 
 test("I varchi non propongono QR permanenti disattivati", () => {
-  assert.ok(source.includes("QR prova (LAN)"));
+  assert.ok(source.includes("QR di prova"));
   assert.ok(!source.includes('this.button("Scarica QR"'));
   assert.ok(source.includes('this.tab="collaudo"'));
   assert.ok(source.includes('this.demoTargetGateId=gate.id'));
   assert.ok(source.includes("I QR con /guest/ restituiscono 404"));
+});
+
+
+test("L'URL esterno HA è la modalità QR predefinita e la LAN è opzionale", () => {
+  assert.ok(source.includes('this.qrMode="https"'));
+  assert.ok(source.includes('this._hass?.config?.external_url'));
+  assert.ok(source.includes('this._hass?.config?.internal_url'));
+  assert.ok(source.includes('if(this.qrMode==="https")grid.append(publicCard)'));
+  assert.ok(source.includes('if(this.qrMode==="lan")grid.append(qrCard)'));
+  assert.ok(source.includes('this.api("public_pilot_qr"'));
+  assert.ok(source.includes('this.api("demo_qr"'));
 });

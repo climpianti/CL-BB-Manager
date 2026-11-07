@@ -415,7 +415,7 @@ def register_commands(hass):
             if not manager.entry.options.get("public_pilot_enabled", False):
                 raise ValueError("Abilitare prima il collaudo HTTPS nelle opzioni.")
             origin = validate_public_origin(
-                manager.entry.options.get("public_pilot_origin", "")
+                hass.config.external_url or manager.entry.options.get("public_pilot_origin", "")
             )
             gate = next(
                 (g for g in manager.data["gates"] if g["id"] == msg["gate_id"]),

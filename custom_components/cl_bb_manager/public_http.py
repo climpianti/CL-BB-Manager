@@ -25,7 +25,7 @@ def _context(request, token):
     if manager is None or not manager.entry.options.get("public_pilot_enabled", False):
         raise web.HTTPNotFound()
     session = manager.public_demo_sessions.get(token)
-    origin = manager.entry.options.get("public_pilot_origin", "")
+    origin = hass.config.external_url or manager.entry.options.get("public_pilot_origin", "")
     if not valid_public_session(session, request.host, origin):
         raise web.HTTPNotFound()
     gate = next(
@@ -85,7 +85,7 @@ class PublicPilotView(HomeAssistantView):
             # Check again under the lock (concurrent submissions and revocations).
             if not valid_public_session(
                 session, request.host,
-                manager.entry.options.get("public_pilot_origin", ""),
+                hass.config.external_url or manager.entry.options.get("public_pilot_origin", ""),
             ) or manager.public_demo_sessions.get(token) is not session:
                 raise web.HTTPNotFound()
             current = next(

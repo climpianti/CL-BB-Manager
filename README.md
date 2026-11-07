@@ -1,6 +1,6 @@
 # CL B&B Manager
 
-**Versione 0.5.0-alpha.1 — collaudo QR/PIN virtuale su LAN e HTTPS opzionale. Non per accessi reali in produzione.**
+**Versione 0.5.0-alpha.2 — collaudo QR/PIN virtuale su LAN e HTTPS opzionale. Non per accessi reali in produzione.**
 
 Integrazione custom per Home Assistant, progettata da CL Impianti per la gestione di varchi, camere e prenotazioni nei B&B.
 
@@ -64,3 +64,7 @@ node --check custom_components/cl_bb_manager/frontend/panel.js
 La pipeline GitHub Actions ripete i controlli a ogni push.
 
 Repository pubblico per collaudo; licenza non ancora definita. Consulta [Roadmap](docs/ROADMAP.md) e [Sicurezza](docs/SECURITY.md).
+
+## Scelta automatica dell'indirizzo QR
+
+Nel pannello **Collaudo accessi** il percorso **HTTPS esterno** è predefinito e usa automaticamente l'URL esterno configurato in **Home Assistant → Impostazioni → Sistema → Rete**. Il backend valida l'URL HTTPS di HA e genera link solo per il portale temporaneo `/public-demo/`, se il collaudo pubblico è stato esplicitamente abilitato nelle opzioni dell'integrazione. La modalità **LAN / Wi-Fi locale** resta selezionabile per i test locali e legge, se presente, l'URL interno configurato in Home Assistant; altrimenti l'indirizzo LAN può essere inserito manualmente. Le due modalità non sono intercambiabili e il percorso permanente `/guest/` resta disabilitato.
