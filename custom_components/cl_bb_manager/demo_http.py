@@ -21,6 +21,18 @@ from .security import candidate_bookings, charge_attempt, demo_target_allowed
 def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf: str = "", complete: bool = False) -> web.Response:
     name = escape(gate_name, quote=True)
     info = escape(message, quote=True)
+    if complete:
+        form_html = "<p role='status'>Comando virtuale inviato. Puoi chiudere questa pagina.</p>"
+    else:
+        form_html = (
+            "<form method='post' autocomplete='off'>"
+            f"<input type='hidden' name='form_csrf' value='{escape(form_csrf, quote=True)}'>"
+            "<label for='pin'>PIN della prenotazione</label>"
+            "<input id='pin' name='pin' type='password' inputmode='numeric'"
+            " minlength='8' maxlength='8' pattern='[0-9]{8}'"
+            " autocomplete='off' required>"
+            "<button type='submit'>Simula apertura</button></form>"
+        )
     document = (
         "<!doctype html><html lang='it'><head>"
         "<meta charset='utf-8'>"
@@ -43,18 +55,7 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         "</style></head><body><main>"
         "<div class='tag'>CL B&B MANAGER · DEMO LOCALE</div>"
         f"<h1>{name}</h1><p>{info}</p>"
-        (
-            "<p role='status'>✓ Comando virtuale inviato. Puoi chiudere questa pagina.</p>"
-            if complete else (
-                "<form method='post' autocomplete='off'>"
-                f"<input type='hidden' name='form_csrf' value='{escape(form_csrf, quote=True)}'>"
-                "<label for='pin'>PIN della prenotazione</label>"
-                "<input id='pin' name='pin' type='password' inputmode='numeric'"
-                " minlength='8' maxlength='8' pattern='[0-9]{8}'"
-                " autocomplete='off' required>"
-                "<button type='submit'>Simula apertura</button></form>"
-            )
-        )
+        f"{form_html}"
         "<small>Sessione temporanea. Nessuna porta reale viene comandata.</small>"
         "</main></body></html>"
     )
