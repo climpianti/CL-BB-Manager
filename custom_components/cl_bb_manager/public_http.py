@@ -85,7 +85,7 @@ class PublicPilotView(HomeAssistantView):
             # Check again under the lock (concurrent submissions and revocations).
             if not valid_public_session(
                 session, request.host,
-                manager.entry.options.get("public_pilot_origin", ""),
+                hass.config.external_url or manager.entry.options.get("public_pilot_origin", ""),
             ) or manager.public_demo_sessions.get(token) is not session:
                 raise web.HTTPNotFound()
             current = next(
