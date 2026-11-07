@@ -165,6 +165,7 @@ def register_commands(hass):
     @websocket_api.websocket_command({
         "type": "cl_bb_manager/add_booking",
         vol.Required("room"): str,
+        vol.Optional("guest_name", default=""): str,
         vol.Required("start"): str,
         vol.Required("end"): str,
         vol.Required("gate_ids"): [str],
@@ -179,7 +180,7 @@ def register_commands(hass):
             # PBKDF2 hashing runs on the executor, not the Home Assistant loop.
             booking = await hass.async_add_executor_job(
                 make_booking, msg["room"], msg["start"],
-                msg["end"], msg["gate_ids"], pin
+                msg["end"], msg["gate_ids"], pin, msg.get("guest_name", "")
             )
             if as_utc(booking["end"]) <= datetime.now(timezone.utc):
                 raise ValueError("Check-out già trascorso.")
