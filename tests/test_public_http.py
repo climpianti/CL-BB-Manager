@@ -46,7 +46,7 @@ def test_public_portal_one_success_then_token_invalid():
         assert first.status == 200
         result = await view.post(request, token)
         assert result.status == 200
-        assert "Apertura virtuale" in result.text
+        assert "Accesso autorizzato" in result.text
         assert len(hass.calls) == 1
         assert hass.calls[0][0:3] == (
             "script", "turn_on",

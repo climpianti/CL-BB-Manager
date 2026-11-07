@@ -47,7 +47,7 @@ class PublicPilotView(HomeAssistantView):
     async def get(self, request, token):
         _, _, session, gate = _context(request, token)
         return _response(
-            gate["name"], "Prova virtuale. Inserisci il PIN temporaneo.",
+            gate["name"], "Inserisci il codice di accesso ricevuto per continuare.",
             form_csrf=session["form_csrf"],
         )
 
@@ -72,7 +72,7 @@ class PublicPilotView(HomeAssistantView):
             or len(expected) < 32
             or not secrets.compare_digest(csrf, expected)
         ):
-            return _response(gate["name"], "Sessione non valida. Riapri il QR.", 403)
+            return _response(gate["name"], "Sessione non valida. Apri nuovamente il QR.", 403)
 
         if not valid_form_origin(
             request.headers.get("Origin"),
@@ -109,7 +109,7 @@ class PublicPilotView(HomeAssistantView):
             if not (len(pin) == 8 and pin.isascii() and pin.isdecimal()):
                 manager.audit("public_pilot_denied", gate["id"])
                 await manager.async_save()
-                return _response(gate["name"], "PIN non valido o scaduto.", 403)
+                return _response(gate["name"], "Codice non valido o scaduto.", 403)
             try:
                 bookings = candidate_bookings(
                     manager.data["bookings"], gate["id"]
@@ -125,7 +125,7 @@ class PublicPilotView(HomeAssistantView):
             if not authorized:
                 manager.audit("public_pilot_denied", gate["id"])
                 await manager.async_save()
-                return _response(gate["name"], "PIN non valido o scaduto.", 403)
+                return _response(gate["name"], "Codice non valido o scaduto.", 403)
 
             if hass.states.get(gate["entity_id"]) is None:
                 raise web.HTTPServiceUnavailable()
@@ -141,6 +141,6 @@ class PublicPilotView(HomeAssistantView):
             manager.audit("public_pilot_open", gate["id"])
             await manager.async_save()
         return _response(
-            gate["name"], "Apertura virtuale inviata correttamente.",
+            gate["name"], "Accesso autorizzato.",
             complete=True,
         )
