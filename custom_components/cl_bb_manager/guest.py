@@ -13,6 +13,7 @@ from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 
 from .const import DOMAIN
+from .access_history import add_access_event
 from .models import pin_matches
 from .security import charge_attempt, demo_target_allowed, candidate_bookings
 
@@ -125,13 +126,14 @@ class GuestView(HomeAssistantView):
                 candidates = candidate_bookings(manager.data["bookings"], gate["id"])
             except ValueError:
                 raise web.HTTPServiceUnavailable()
-            authorized = False
+            matched_booking = None
             for booking in candidates:
                 if await hass.async_add_executor_job(pin_matches, pin, booking):
-                    authorized = True
+                    matched_booking = booking
                     break
-            if not authorized:
+            if matched_booking is None:
                 manager.audit("guest_denied", gate["id"])
+                add_access_event(manager.data, source="legacy", result="denied", gate=gate)
                 await manager.async_save()
                 return page(gate["name"], "Codice non valido o scaduto.", 403)
             if hass.states.get(gate["entity_id"]) is None:
@@ -144,6 +146,10 @@ class GuestView(HomeAssistantView):
             except Exception as exc:
                 raise web.HTTPServiceUnavailable() from exc
             manager.audit("guest_demo_open", gate["id"])
+            add_access_event(
+                manager.data, source="legacy", result="authorized",
+                gate=gate, booking=matched_booking,
+            )
             await manager.async_save()
         return page(gate["name"], "Apertura simulata inviata.")
 
