@@ -1,28 +1,77 @@
 class ClBbManagerPanel extends HTMLElement {
- constructor(){super();this.attachShadow({mode:"open"});this.loaded=false;this.tab="varchi";this.data=null;this.error="";this.pin="";this.testResult=null;this.testBusy=false;this.demoQR=null;this.demoTargetGateId=null;this.qrMode="https";}
+ constructor(){super();this.attachShadow({mode:"open"});this.loaded=false;this.tab="dashboard";this.data=null;this.error="";this.pin="";this.testResult=null;this.testBusy=false;this.demoQR=null;this.demoTargetGateId=null;this.qrMode="https";}
  set hass(h){this._hass=h;if(!this.loaded){this.loaded=true;this.load();}}
  api(type,body={}){return this._hass.callWS({type:"cl_bb_manager/"+type,...body});}
  async load(){try{this.data=await this.api("list");this.error="";}catch(e){this.error=this.describeError(e);}this.render();}
  async act(type,body={},pin=false){try{const r=await this.api(type,body);this.pin=pin?r.pin_once:"";this.data=pin?r.data:r;this.error="";}catch(e){this.error=this.describeError(e);}this.render();}
  describeError(e){if(typeof e==="string")return e;const candidate=e?.message||e?.error?.message||e?.description||e?.error?.description;return typeof candidate==="string"&&candidate.trim()?candidate:"Operazione non riuscita. Verifica i dati inseriti e riprova.";}
  showValidation(form,message){let note=form.querySelector("[data-cl-validation]");if(!note){note=this.node("div","","notice");note.setAttribute("data-cl-validation","true");note.setAttribute("role","alert");form.prepend(note);}note.textContent=message;}
- async qr(gate){const base=prompt("URL pubblico HTTPS della struttura (es. https://accesso.esempio.it):");if(!base)return;try{const data=await this.api("qr",{gate_id:gate.id,base_url:base});const blob=new Blob([data.svg],{type:"image/svg+xml"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="qr-"+gate.name.toLowerCase().replace(/[^a-z0-9]+/g,"-")+".svg";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);this.error="QR generato. Portale ospiti attualmente disabilitato: non stamparlo per i clienti.";}catch(e){this.error=this.describeError(e);}this.render();}
  node(t,text="",cls=""){const n=document.createElement(t);n.textContent=text;n.className=cls;return n;}
  button(t,cb){const b=this.node("button",t);b.type="button";b.addEventListener("click",cb);return b;}
  field(form,label,name,type="text",value=""){const wrap=this.node("label",label);const inp=this.node("input");inp.name=name;inp.type=type;inp.value=value;inp.required=true;wrap.append(inp);form.append(wrap);return inp;}
  select(form,label,name,options,selected){const wrap=this.node("label",label);const s=this.node("select");s.name=name;for(const [v,t] of options){const o=this.node("option",t);o.value=v;o.selected=v===selected;s.append(o);}wrap.append(s);form.append(wrap);}
  card(title){const a=this.node("section","","card");a.append(this.node("h2",title));return a;}
  render(){const root=this.shadowRoot;root.replaceChildren();const style=this.node("style");
- style.textContent=":host{display:block;background:#eff4fa;color:#18314f;min-height:100%;font:14px system-ui}.page{max-width:1200px;margin:auto;padding:22px}h1{font-size:28px}h2{font-size:19px;margin-top:0}.nav{display:flex;gap:10px;overflow:auto;margin:20px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:16px}.card{background:#fff;border:1px solid #dce6f2;border-radius:18px;padding:22px}button{background:#19509b;color:white;border:0;border-radius:10px;padding:11px;margin:4px;cursor:pointer}label{display:grid;gap:7px;margin:12px 0}input,select{padding:10px;border:1px solid #bbcddd;border-radius:9px;font:inherit}.item{padding:13px 0;border-bottom:1px solid #edf1f6}.small{color:#617e9f;font-size:12px;overflow-wrap:anywhere}.notice{background:#fff1e0;padding:14px;border-radius:10px;margin:10px 0}";root.append(style);
- const page=this.node("main","","page");root.append(page);page.append(this.node("div","CL IMPIANTI / HOSPITALITY","small"),this.node("h1","CL B&B Manager"),this.node("p",this.data?.structure||"Caricamento..."));
+ style.textContent="@import url('/cl_bb_manager_static/bluetech-glass.css?v=0.5.0-alpha.3');";root.append(style);
+ const page=this.node("main","","page");root.append(page);const hero=this.node("header","","hero");
+ const brand=this.node("div","","hero-brand");
+ brand.append(this.node("span","CL","brand-mark"));
+ const brandText=this.node("span","","brand-word");
+ brandText.append(this.node("strong","CL CONTROL"),this.node("small","Hospitality · Access Manager"));
+ brand.append(brandText);
+ hero.append(brand,this.node("h1",this.data?.structure||"CL B&B Manager"),this.node("p","Gestione prenotazioni, varchi e autorizzazioni","subtitle"));
+ const context=this.node("div","","context");
+ context.append(this.node("span","Gestione accessi","tag safe"),this.node("span","Ambiente pilota · solo varchi virtuali","tag"));
+ hero.append(context);page.append(hero);
  if(this.error)page.append(this.node("div",this.error,"notice"));
  if(this.pin){const box=this.node("div","PIN generato (mostrato una volta sola): "+this.pin+" ","notice");box.append(this.button("Copia PIN",()=>navigator.clipboard?.writeText(this.pin)));page.append(box);}
- if(!this.data)return;const nav=this.node("nav","","nav");for(const [id,label] of [["varchi","Varchi"],["prenotazioni","Prenotazioni"],["registro","Registro"],["collaudo","Collaudo accessi"]])nav.append(this.button(label,()=>{this.tab=id;this.pin="";this.render();}));page.append(nav);
+ if(!this.data)return;const nav=this.node("nav","","nav");for(const [id,label] of [["dashboard","Panoramica"],["prenotazioni","Prenotazioni"],["accessi","Accessi"],["varchi","Varchi"],["registro","Registro"],["impostazioni","Impostazioni"]]){
+   const b=this.button(label,()=>{this.tab=id;this.pin="";this.render();});
+   if(this.tab===id)b.classList.add("active");
+   nav.append(b);
+ }page.append(nav);
  const grid=this.node("div","","grid");page.append(grid);
- if(this.tab==="varchi")this.gates(grid);if(this.tab==="prenotazioni")this.bookings(grid);if(this.tab==="registro")this.events(grid);if(this.tab==="collaudo")this.testAccess(grid);
- page.append(this.node("p","ALPHA 0.5.0.2 — QR HTTPS automatico e LAN opzionale; portale /guest/ permanente disattivato.","small"));
+ if(this.tab==="dashboard")this.dashboard(grid);if(this.tab==="varchi")this.gates(grid);if(this.tab==="prenotazioni")this.bookings(grid);if(this.tab==="registro")this.events(grid);if(this.tab==="accessi")this.testAccess(grid);if(this.tab==="impostazioni")this.settings(grid);
+ page.append(this.node("p","Versione pilota · QR temporanei e soli varchi virtuali. Non utilizzare con porte fisiche.","footer-note"));
  }
- gates(grid){const list=this.card("Gestione varchi");list.append(this.node("p","I QR permanenti sono disattivati. Usa «QR di prova» per HTTPS (predefinito) oppure LAN opzionale.","notice"));for(const gate of this.data.gates){const line=this.node("div","","item");line.append(this.node("strong",gate.name),this.node("p",gate.entity_id+" · "+gate.kind+" · "+(gate.enabled?"Abilitato":"Disabilitato"),"small"));line.append(this.button("Modifica",()=>this.edit(gate,grid)));line.append(this.button("QR di prova",()=>{this.demoTargetGateId=gate.id;this.demoQR=null;this.qrMode="https";this.tab="collaudo";this.render();}));line.append(this.button(gate.enabled?"Disabilita":"Abilita",()=>this.act("update_gate",{gate_id:gate.id,name:gate.name,entity_id:gate.entity_id,action:gate.action,kind:gate.kind,enabled:!gate.enabled})));line.append(this.button("Elimina",()=>{if(confirm("Eliminare "+gate.name+"?"))this.act("remove_gate",{gate_id:gate.id});}));list.append(line);}grid.append(list);
+
+ dashboard(grid){
+   const metrics=this.node("div","","metrics");
+   const all=this.data.gates||[],bookings=this.data.bookings||[];
+   for(const [label,value] of [["Varchi abilitati",all.filter(g=>g.enabled).length],["Prenotazioni non revocate",bookings.filter(b=>!b.revoked&&new Date(b.end)>new Date()).length],["Varchi configurati",all.length]]){
+     const metric=this.node("div","","metric");
+     metric.append(this.node("strong",String(value)),this.node("span",label));
+     metrics.append(metric);
+   }
+   grid.append(metrics);
+   const welcome=this.card("Benvenuto in CL Control Hospitality");
+   welcome.append(this.node("p","Gestisci i permessi, crea i codici di accesso e genera i QR temporanei dalla sezione Accessi."));
+   welcome.append(this.button("Gestisci accessi",()=>{this.tab="accessi";this.render();}));
+   welcome.append(this.button("Nuova prenotazione",()=>{this.tab="prenotazioni";this.render();}));
+   grid.append(welcome);
+   const status=this.card("Stato dei servizi");
+   status.append(this.node("p","QR HTTPS temporanei: "+(this.data.public_pilot==="enabled"?"Abilitati":"Disabilitati")));
+   status.append(this.node("p","Portale QR permanente: disattivato"));
+   status.append(this.node("p","I comandi agiscono soltanto su varchi virtuali in questa versione.","small"));
+   grid.append(status);
+ }
+ settings(grid){
+   const addresses=this.card("Indirizzi di accesso");
+   const external=this._hass?.config?.external_url||"";
+   const internal=this._hass?.config?.internal_url||"";
+   addresses.append(this.node("p","Indirizzo esterno Home Assistant","small"),this.node("p",external||"Non configurato"));
+   addresses.append(this.node("p","Indirizzo interno Home Assistant","small"),this.node("p",internal||"Non configurato · opzionale"));
+   addresses.append(this.node("p","Gli indirizzi si modificano in Home Assistant → Impostazioni → Sistema → Rete.","small"));
+   grid.append(addresses);
+   const security=this.card("Sicurezza e modalità di accesso");
+   security.append(this.node("p","QR HTTPS temporanei: "+(this.data.public_pilot==="enabled"?"Abilitati":"Disabilitati")));
+   security.append(this.node("p","Portale QR permanente: disattivato"));
+   security.append(this.node("p","Serrature e attuatori fisici: non collegati"));
+   security.append(this.node("p","I QR temporanei durano 10 minuti e, dopo un comando riuscito, non sono riutilizzabili. In questa versione funzionano esclusivamente con gli script virtuali consentiti.","small"));
+   grid.append(security);
+ }
+
+ gates(grid){const list=this.card("Gestione varchi");list.append(this.node("p","I QR permanenti sono disattivati. Usa «QR di prova» per HTTPS (predefinito) oppure LAN opzionale.","notice"));for(const gate of this.data.gates){const line=this.node("div","","item");line.append(this.node("strong",gate.name),this.node("p",gate.entity_id+" · "+gate.kind+" · "+(gate.enabled?"Abilitato":"Disabilitato"),"small"));line.append(this.button("Modifica",()=>this.edit(gate,grid)));line.append(this.button("QR di prova",()=>{this.demoTargetGateId=gate.id;this.demoQR=null;this.qrMode="https";this.tab="accessi";this.render();}));line.append(this.button(gate.enabled?"Disabilita":"Abilita",()=>this.act("update_gate",{gate_id:gate.id,name:gate.name,entity_id:gate.entity_id,action:gate.action,kind:gate.kind,enabled:!gate.enabled})));line.append(this.button("Elimina",()=>{if(confirm("Eliminare "+gate.name+"?"))this.act("remove_gate",{gate_id:gate.id});}));list.append(line);}grid.append(list);
  const card=this.card("Aggiungi varco");const form=this.node("form");this.field(form,"Nome varco","name");this.field(form,"Entità HA","entity_id");this.select(form,"Azione","action",[["script.turn_on","Script"],["button.press","Pulsante"],["lock.unlock","Serratura"]],"script.turn_on");this.select(form,"Tipo","kind",[["private","Privato"],["shared","Comune"]],"private");const send=this.node("button","Salva varco disabilitato");send.type="submit";form.append(send);form.onsubmit=e=>{e.preventDefault();this.act("add_gate",Object.fromEntries(new FormData(form)));};card.append(form);grid.append(card);}
  edit(gate,grid){const card=this.card("Modifica "+gate.name);const form=this.node("form");this.field(form,"Nome","name","text",gate.name);this.field(form,"Entità","entity_id","text",gate.entity_id);this.select(form,"Azione","action",[["script.turn_on","Script"],["button.press","Pulsante"],["lock.unlock","Serratura"]],gate.action);this.select(form,"Tipo","kind",[["private","Privato"],["shared","Comune"]],gate.kind);const submit=this.node("button","Salva modifiche");submit.type="submit";form.append(submit);form.onsubmit=e=>{e.preventDefault();this.act("update_gate",{...Object.fromEntries(new FormData(form)),gate_id:gate.id,enabled:gate.enabled});};card.append(form);grid.prepend(card);}
  bookings(grid){const card=this.card("Nuova prenotazione");const form=this.node("form");this.field(form,"Camera","room");this.field(form,"Check-in","start","datetime-local");this.field(form,"Check-out","end","datetime-local");const choices=this.node("div");choices.append(this.node("strong","Varchi autorizzati"));for(const gate of this.data.gates.filter(g=>g.enabled)){const label=this.node("label",gate.name);const cb=this.node("input");cb.type="checkbox";cb.value=gate.id;label.append(cb);choices.append(label);}form.append(choices);const submit=this.node("button","Genera prenotazione e PIN");submit.type="submit";form.append(submit);form.onsubmit=e=>{e.preventDefault();const data=new FormData(form);const a=new Date(data.get("start"));const b=new Date(data.get("end"));const gate_ids=[...choices.querySelectorAll("input:checked")].map(x=>x.value);if(!Number.isFinite(+a)||!Number.isFinite(+b)){this.showValidation(form,"Controlla le date del check-in e del check-out.");return;}if(b<=a){this.showValidation(form,"Il check-out deve essere successivo al check-in.");return;}if(b<=new Date()){this.showValidation(form,"Il check-out non può essere nel passato.");return;}if(!gate_ids.length){this.showValidation(form,"Seleziona almeno un varco autorizzato per questa prenotazione (per esempio Camera 1).");return;}this.act("add_booking",{room:data.get("room"),start:a.toISOString(),end:b.toISOString(),gate_ids},true);};card.append(form);grid.append(card);
