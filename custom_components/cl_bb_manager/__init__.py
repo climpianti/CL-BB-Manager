@@ -123,7 +123,6 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         sidebar_title=None,
         sidebar_icon="mdi:bed",
         require_admin=False,
-        config_panel_domain=DOMAIN,
     )
     return True
 
