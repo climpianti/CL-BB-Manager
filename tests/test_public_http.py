@@ -23,6 +23,7 @@ def fixture():
         "public_pilot_origin": ORIGIN,
     })
     manager.public_demo_sessions = {}
+    hass.config = SimpleNamespace(external_url=ORIGIN)
     token, session = policy.create_public_session("camera-1", ORIGIN)
     manager.public_demo_sessions[token] = session
     return manager, hass, token
