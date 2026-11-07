@@ -33,11 +33,11 @@ test("Il form verifica la selezione del varco prima di generare il PIN", () => {
 });
 
 test("I varchi non propongono QR permanenti disattivati", () => {
-  assert.ok(source.includes("QR di prova"));
+  assert.ok(source.includes("QR di accesso"));
   assert.ok(!source.includes('this.button("Scarica QR"'));
   assert.ok(source.includes('this.tab="collaudo"'));
   assert.ok(source.includes('this.demoTargetGateId=gate.id'));
-  assert.ok(source.includes("I QR con /guest/ restituiscono 404"));
+  assert.ok(source.includes("L\u0027accesso permanente non è ancora disponibile."));
 });
 
 
@@ -49,4 +49,15 @@ test("L'URL esterno HA è la modalità QR predefinita e la LAN è opzionale", ()
   assert.ok(source.includes('if(this.qrMode==="lan")grid.append(qrCard)'));
   assert.ok(source.includes('this.api("public_pilot_qr"'));
   assert.ok(source.includes('this.api("demo_qr"'));
+});
+
+
+test("CL Control BlueTech Glass conserva navigazione e stati di collaudo", () => {
+  assert.ok(source.includes("bluetech-glass.css"));
+  assert.ok(source.includes('"dashboard","Panoramica"'));
+  assert.ok(source.includes('"accessi","Accessi"'));
+  assert.ok(source.includes('"impostazioni","Impostazioni"'));
+  assert.ok(source.includes('"Genera QR di accesso"'));
+  assert.ok(source.includes('Ambiente pilota · solo varchi virtuali'));
+  assert.ok(!source.includes('this.button("Scarica QR"'));
 });
