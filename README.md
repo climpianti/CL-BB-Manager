@@ -63,4 +63,4 @@ node --check custom_components/cl_bb_manager/frontend/panel.js
 
 La pipeline GitHub Actions ripete i controlli a ogni push.
 
-Repository privato, licenza non ancora definita. Consulta [Roadmap](docs/ROADMAP.md) e [Sicurezza](docs/SECURITY.md).
+Repository pubblico per collaudo; licenza non ancora definita. Consulta [Roadmap](docs/ROADMAP.md) e [Sicurezza](docs/SECURITY.md).
