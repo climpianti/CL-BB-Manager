@@ -70,6 +70,7 @@ def make_demo_session(gate_id: str, origin: str, now: float | None = None) -> tu
     token = secrets.token_urlsafe(32)
     return token, {
         "gate_id": gate_id,
+        "form_csrf": secrets.token_urlsafe(32),
         "origin": validated,
         "host": host,
         "expires": (time.time() if now is None else now) + DEMO_DURATION_SECONDS,
