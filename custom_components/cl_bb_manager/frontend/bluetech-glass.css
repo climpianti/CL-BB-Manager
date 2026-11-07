@@ -37,7 +37,7 @@
 }
 .hero:after{content:"";position:absolute;inset:auto 20px 0 20px;height:1px;background:linear-gradient(90deg,transparent,#19baff,transparent);opacity:.65}
 .hero-brand{display:flex;gap:13px;align-items:center;flex-wrap:wrap}
-.brand-mark{width:45px;height:45px;display:grid;place-items:center;border-radius:14px;background:linear-gradient(145deg,#1e9ed4,#13446d);color:#fff;font-size:17px;font-weight:800;letter-spacing:-.09em;box-shadow:0 4px 20px #19baff33;border:1px solid #7dd5f87a}
+.brand-logo{width:79px;height:70px;display:block;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 5px 15px rgba(25,186,255,.19))}
 .brand-word{display:grid;line-height:1.2}
 .brand-word strong{font-size:14px;letter-spacing:.13em;color:#fff}
 .brand-word small{color:#8edaff;font-size:11px;letter-spacing:.12em;text-transform:uppercase}
