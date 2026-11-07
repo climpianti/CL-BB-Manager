@@ -156,4 +156,4 @@ class ClBbManagerPanel extends HTMLElement {
  }
  events(grid){const card=this.card("Registro modifiche");for(const event of [...this.data.events].reverse()){const row=this.node("div","","item");row.append(this.node("strong",event.event),this.node("p",new Date(event.at).toLocaleString("it-IT")+" · "+event.details,"small"));card.append(row);}grid.append(card);}
 }
-customElements.define("cl-bb-manager-panel",ClBbManagerPanel);
+if (!customElements.get("cl-bb-manager-panel")) { customElements.define("cl-bb-manager-panel",ClBbManagerPanel); }
