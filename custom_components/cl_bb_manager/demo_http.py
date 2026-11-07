@@ -6,6 +6,7 @@ temporary session created by an authenticated HA administrator.
 from __future__ import annotations
 
 from html import escape
+import secrets
 
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
@@ -17,7 +18,7 @@ from .models import pin_matches
 from .security import candidate_bookings, charge_attempt, demo_target_allowed
 
 
-def _response(gate_name: str, message: str = "", status: int = 200) -> web.Response:
+def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf: str = "") -> web.Response:
     name = escape(gate_name, quote=True)
     info = escape(message, quote=True)
     document = (
@@ -43,6 +44,7 @@ def _response(gate_name: str, message: str = "", status: int = 200) -> web.Respo
         "<div class='tag'>CL B&B MANAGER · DEMO LOCALE</div>"
         f"<h1>{name}</h1><p>{info}</p>"
         "<form method='post' autocomplete='off'>"
+        f"<input type='hidden' name='form_csrf' value='{escape(form_csrf, quote=True)}'>"
         "<label for='pin'>PIN della prenotazione</label>"
         "<input id='pin' name='pin' type='password' inputmode='numeric'"
         " minlength='8' maxlength='8' pattern='[0-9]{8}'"
@@ -91,13 +93,27 @@ class DemoPortalView(HomeAssistantView):
     requires_auth = False
 
     async def get(self, request, token):
-        _, _, _, gate = _session_and_gate(request, token)
-        return _response(gate["name"], "Inserisci un PIN valido per provare il varco virtuale.")
+        _, _, session, gate = _session_and_gate(request, token)
+        return _response(
+            gate["name"], "Inserisci un PIN valido per provare il varco virtuale.",
+            form_csrf=session["form_csrf"],
+        )
 
     async def post(self, request, token):
         hass, manager, session, gate = _session_and_gate(request, token)
-        if request.headers.get("Origin", "").lower() != session["origin"]:
-            raise web.HTTPForbidden()
+        # Some mobile form submissions legitimately omit Origin. Cross-origin
+        # submissions still fail closed, and EVERY POST needs the session-bound
+        # hidden CSRF value issued by the GET response.
+        supplied_origin = request.headers.get("Origin")
+        fetch_site = request.headers.get("Sec-Fetch-Site")
+        if (
+            (supplied_origin is not None and supplied_origin.lower() != session["origin"])
+            or fetch_site == "cross-site"
+        ):
+            return _response(
+                gate["name"], "Origine non autorizzata. Riapri il QR sulla LAN.",
+                403, form_csrf=session["form_csrf"],
+            )
         if (
             request.content_length is None
             or request.content_length > 256
@@ -107,8 +123,22 @@ class DemoPortalView(HomeAssistantView):
         try:
             form = await request.post()
             pin = str(form.get("pin", ""))
+            supplied_csrf = str(form.get("form_csrf", ""))
         except (ValueError, web.HTTPException) as exc:
             raise web.HTTPBadRequest() from exc
+
+        # Do not trust an Origin-less POST merely because it has the QR token.
+        # The form secret must be the one rendered on that session's GET.
+        expected_csrf = session.get("form_csrf", "")
+        if (
+            not isinstance(expected_csrf, str)
+            or len(expected_csrf) < 32
+            or not secrets.compare_digest(supplied_csrf, expected_csrf)
+        ):
+            return _response(
+                gate["name"], "Sessione del modulo non valida. Riapri il QR.",
+                403, form_csrf=expected_csrf if isinstance(expected_csrf, str) else "",
+            )
 
         async with manager.lock:
             # Fail closed if a session expires or the gate is modified while
@@ -131,12 +161,12 @@ class DemoPortalView(HomeAssistantView):
             except (TypeError, ValueError) as exc:
                 raise web.HTTPServiceUnavailable() from exc
             if not allowed:
-                return _response(gate["name"], "Troppi tentativi. Riprova più tardi.", 429)
+                return _response(gate["name"], "Troppi tentativi. Riprova più tardi.", 429, form_csrf=session["form_csrf"])
 
             if not (len(pin) == 8 and pin.isascii() and pin.isdecimal()):
                 manager.audit("demo_qr_denied", gate["id"])
                 await manager.async_save()
-                return _response(gate["name"], "PIN non valido o scaduto.", 403)
+                return _response(gate["name"], "PIN non valido o scaduto.", 403, form_csrf=session["form_csrf"])
 
             try:
                 candidates = candidate_bookings(manager.data["bookings"], gate["id"])
@@ -151,7 +181,7 @@ class DemoPortalView(HomeAssistantView):
             if not verified:
                 manager.audit("demo_qr_denied", gate["id"])
                 await manager.async_save()
-                return _response(gate["name"], "PIN non valido o scaduto.", 403)
+                return _response(gate["name"], "PIN non valido o scaduto.", 403, form_csrf=session["form_csrf"])
 
             if hass.states.get(gate["entity_id"]) is None:
                 raise web.HTTPServiceUnavailable()
@@ -166,4 +196,4 @@ class DemoPortalView(HomeAssistantView):
             manager.audit("demo_qr_open", gate["id"])
             await manager.async_save()
 
-        return _response(gate["name"], "Apertura virtuale inviata correttamente.")
+        return _response(gate["name"], "Apertura virtuale inviata correttamente.", form_csrf=session["form_csrf"])
