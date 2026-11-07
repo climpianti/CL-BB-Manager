@@ -24,7 +24,7 @@ class ClBbManagerPanel extends HTMLElement {
  context.append(this.node("span","Gestione accessi","tag safe"),this.node("span","Ambiente pilota · solo varchi virtuali","tag"));
  hero.append(context);page.append(hero);
  if(this.error)page.append(this.node("div",this.error,"notice"));
- if(this.pin){const box=this.node("div","PIN generato (mostrato una volta sola): "+this.pin+" ","notice");box.append(this.button("Copia PIN",()=>navigator.clipboard?.writeText(this.pin)));page.append(box);}
+ if(this.pin){const box=this.node("div","Codice di accesso generato · visibile una sola volta: "+this.pin+" ","notice");box.append(this.button("Copia codice",()=>navigator.clipboard?.writeText(this.pin)));page.append(box);}
  if(!this.data)return;const nav=this.node("nav","","nav");for(const [id,label] of [["dashboard","Panoramica"],["prenotazioni","Prenotazioni"],["accessi","Accessi"],["varchi","Varchi"],["registro","Registro"],["impostazioni","Impostazioni"]]){
    const b=this.button(label,()=>{this.tab=id;this.pin="";this.render();});
    if(this.tab===id)b.classList.add("active");
@@ -71,14 +71,14 @@ class ClBbManagerPanel extends HTMLElement {
    grid.append(security);
  }
 
- gates(grid){const list=this.card("Gestione varchi");list.append(this.node("p","I QR permanenti sono disattivati. Usa «QR di prova» per HTTPS (predefinito) oppure LAN opzionale.","notice"));for(const gate of this.data.gates){const line=this.node("div","","item");line.append(this.node("strong",gate.name),this.node("p",gate.entity_id+" · "+gate.kind+" · "+(gate.enabled?"Abilitato":"Disabilitato"),"small"));line.append(this.button("Modifica",()=>this.edit(gate,grid)));line.append(this.button("QR di prova",()=>{this.demoTargetGateId=gate.id;this.demoQR=null;this.qrMode="https";this.tab="accessi";this.render();}));line.append(this.button(gate.enabled?"Disabilita":"Abilita",()=>this.act("update_gate",{gate_id:gate.id,name:gate.name,entity_id:gate.entity_id,action:gate.action,kind:gate.kind,enabled:!gate.enabled})));line.append(this.button("Elimina",()=>{if(confirm("Eliminare "+gate.name+"?"))this.act("remove_gate",{gate_id:gate.id});}));list.append(line);}grid.append(list);
- const card=this.card("Aggiungi varco");const form=this.node("form");this.field(form,"Nome varco","name");this.field(form,"Entità HA","entity_id");this.select(form,"Azione","action",[["script.turn_on","Script"],["button.press","Pulsante"],["lock.unlock","Serratura"]],"script.turn_on");this.select(form,"Tipo","kind",[["private","Privato"],["shared","Comune"]],"private");const send=this.node("button","Salva varco disabilitato");send.type="submit";form.append(send);form.onsubmit=e=>{e.preventDefault();this.act("add_gate",Object.fromEntries(new FormData(form)));};card.append(form);grid.append(card);}
+ gates(grid){const list=this.card("Varchi della struttura");list.append(this.node("p","Gestisci qui i varchi e i relativi script. Per creare un QR vai nella sezione Accessi.","notice"));for(const gate of this.data.gates){const line=this.node("div","","item");line.append(this.node("strong",gate.name),this.node("p",gate.entity_id+" · "+gate.kind+" · "+(gate.enabled?"Abilitato":"Disabilitato"),"small"));line.append(this.button("Modifica",()=>this.edit(gate,grid)));line.append(this.button("QR di accesso",()=>{this.demoTargetGateId=gate.id;this.demoQR=null;this.qrMode="https";this.tab="accessi";this.render();}));line.append(this.button(gate.enabled?"Disattiva":"Attiva",()=>this.act("update_gate",{gate_id:gate.id,name:gate.name,entity_id:gate.entity_id,action:gate.action,kind:gate.kind,enabled:!gate.enabled})));line.append(this.button("Elimina",()=>{if(confirm("Eliminare "+gate.name+"?"))this.act("remove_gate",{gate_id:gate.id});}));list.append(line);}grid.append(list);
+ const card=this.card("Nuovo varco");const form=this.node("form");this.field(form,"Nome varco","name");this.field(form,"Entità HA","entity_id");this.select(form,"Azione","action",[["script.turn_on","Script"],["button.press","Pulsante"],["lock.unlock","Serratura"]],"script.turn_on");this.select(form,"Tipo","kind",[["private","Privato"],["shared","Comune"]],"private");const send=this.node("button","Salva varco inattivo");send.type="submit";form.append(send);form.onsubmit=e=>{e.preventDefault();this.act("add_gate",Object.fromEntries(new FormData(form)));};card.append(form);grid.append(card);}
  edit(gate,grid){const card=this.card("Modifica "+gate.name);const form=this.node("form");this.field(form,"Nome","name","text",gate.name);this.field(form,"Entità","entity_id","text",gate.entity_id);this.select(form,"Azione","action",[["script.turn_on","Script"],["button.press","Pulsante"],["lock.unlock","Serratura"]],gate.action);this.select(form,"Tipo","kind",[["private","Privato"],["shared","Comune"]],gate.kind);const submit=this.node("button","Salva modifiche");submit.type="submit";form.append(submit);form.onsubmit=e=>{e.preventDefault();this.act("update_gate",{...Object.fromEntries(new FormData(form)),gate_id:gate.id,enabled:gate.enabled});};card.append(form);grid.prepend(card);}
- bookings(grid){const card=this.card("Nuova prenotazione");const form=this.node("form");this.field(form,"Camera","room");this.field(form,"Check-in","start","datetime-local");this.field(form,"Check-out","end","datetime-local");const choices=this.node("div");choices.append(this.node("strong","Varchi autorizzati"));for(const gate of this.data.gates.filter(g=>g.enabled)){const label=this.node("label",gate.name);const cb=this.node("input");cb.type="checkbox";cb.value=gate.id;label.append(cb);choices.append(label);}form.append(choices);const submit=this.node("button","Genera prenotazione e PIN");submit.type="submit";form.append(submit);form.onsubmit=e=>{e.preventDefault();const data=new FormData(form);const a=new Date(data.get("start"));const b=new Date(data.get("end"));const gate_ids=[...choices.querySelectorAll("input:checked")].map(x=>x.value);if(!Number.isFinite(+a)||!Number.isFinite(+b)){this.showValidation(form,"Controlla le date del check-in e del check-out.");return;}if(b<=a){this.showValidation(form,"Il check-out deve essere successivo al check-in.");return;}if(b<=new Date()){this.showValidation(form,"Il check-out non può essere nel passato.");return;}if(!gate_ids.length){this.showValidation(form,"Seleziona almeno un varco autorizzato per questa prenotazione (per esempio Camera 1).");return;}this.act("add_booking",{room:data.get("room"),start:a.toISOString(),end:b.toISOString(),gate_ids},true);};card.append(form);grid.append(card);
- const list=this.card("Prenotazioni");for(const booking of [...this.data.bookings].reverse()){const row=this.node("div","","item");row.append(this.node("strong",booking.room),this.node("p",new Date(booking.start).toLocaleString("it-IT")+" → "+new Date(booking.end).toLocaleString("it-IT"),"small"),this.node("p",booking.revoked?"Revocata":"Non revocata","small"));if(!booking.revoked)row.append(this.button("Revoca",()=>{if(confirm("Revocare il PIN?"))this.act("revoke_booking",{booking_id:booking.id});}));list.append(row);}grid.append(list);}
+ bookings(grid){const card=this.card("Nuova prenotazione");const form=this.node("form");this.field(form,"Camera / Unità","room");this.field(form,"Check-in","start","datetime-local");this.field(form,"Check-out","end","datetime-local");const choices=this.node("div");choices.append(this.node("strong","Varchi autorizzati"));for(const gate of this.data.gates.filter(g=>g.enabled)){const label=this.node("label",gate.name);const cb=this.node("input");cb.type="checkbox";cb.value=gate.id;label.append(cb);choices.append(label);}form.append(choices);const submit=this.node("button","Crea prenotazione e codice");submit.type="submit";form.append(submit);form.onsubmit=e=>{e.preventDefault();const data=new FormData(form);const a=new Date(data.get("start"));const b=new Date(data.get("end"));const gate_ids=[...choices.querySelectorAll("input:checked")].map(x=>x.value);if(!Number.isFinite(+a)||!Number.isFinite(+b)){this.showValidation(form,"Controlla le date del check-in e del check-out.");return;}if(b<=a){this.showValidation(form,"Il check-out deve essere successivo al check-in.");return;}if(b<=new Date()){this.showValidation(form,"Il check-out non può essere nel passato.");return;}if(!gate_ids.length){this.showValidation(form,"Seleziona almeno un varco autorizzato per questa prenotazione (per esempio Camera 1).");return;}this.act("add_booking",{room:data.get("room"),start:a.toISOString(),end:b.toISOString(),gate_ids},true);};card.append(form);grid.append(card);
+ const list=this.card("Prenotazioni");for(const booking of [...this.data.bookings].reverse()){const row=this.node("div","","item");row.append(this.node("strong",booking.room),this.node("p",new Date(booking.start).toLocaleString("it-IT")+" → "+new Date(booking.end).toLocaleString("it-IT"),"small"),this.node("p",booking.revoked?"Revocata":"Autorizzata per le date indicate","small"));if(!booking.revoked)row.append(this.button("Revoca",()=>{if(confirm("Revocare il PIN?"))this.act("revoke_booking",{booking_id:booking.id});}));list.append(row);}grid.append(list);}
 
  testAccess(grid){
-   const card=this.card("Collaudo accessi · solo demo");
+   const card=this.card("Controllo autorizzazioni");
    card.append(this.node("p","Verifica autorizzazioni e PIN direttamente dall'area installatore. Nessun collegamento al portale ospiti pubblico.","small"));
    const demoScripts=new Set([
      "script.cl_bb_demo_apri_cancello","script.cl_bb_demo_apri_portone",
@@ -92,11 +92,11 @@ class ClBbManagerPanel extends HTMLElement {
    }
    const form=this.node("form");
    this.select(form,"Varco da verificare","gate_id",gates.map(g=>[g.id,g.name]),this.demoTargetGateId||gates[0].id);
-   const pinInput=this.field(form,"PIN temporaneo di 8 cifre","pin","password");
+   const pinInput=this.field(form,"Codice di accesso · 8 cifre","pin","password");
    pinInput.autocomplete="off";pinInput.inputMode="numeric";pinInput.pattern="[0-9]{8}";pinInput.maxLength=8;
    const buttons=this.node("div","","nav");
-   const verify=this.button("Verifica PIN",()=>run(false));
-   const simulate=this.button("Verifica e simula apertura",()=>run(true));
+   const verify=this.button("Controlla codice",()=>run(false));
+   const simulate=this.button("Verifica e invia comando",()=>run(true));
    buttons.append(verify,simulate);
    form.append(buttons);
    form.addEventListener("submit",event=>{event.preventDefault();run(false);});
@@ -113,10 +113,10 @@ class ClBbManagerPanel extends HTMLElement {
        const result=await this.api("demo_check_pin",{gate_id,pin,simulate_open:simulateOpen});
        if(result.allowed){
          this.testResult={kind:"success",message:result.opened
-           ?"PIN valido: comando inviato al varco virtuale selezionato."
-           :"PIN valido: autorizzazione confermata, nessuna apertura eseguita."};
+           ?"Codice valido: comando inviato al varco virtuale selezionato."
+           :"Codice valido: autorizzazione confermata, nessun comando inviato."};
        }else{
-         this.testResult={kind:"denied",message:"Accesso negato. PIN errato, scaduto, revocato o non valido per questo varco."};
+         this.testResult={kind:"denied",message:"Accesso negato. Codice non valido, scaduto o senza autorizzazione per questo varco."};
        }
      }catch(err){
        this.testResult={kind:"error",message:"Verifica non riuscita: "+this.describeError(err).slice(0,180)};
@@ -139,7 +139,7 @@ class ClBbManagerPanel extends HTMLElement {
    modeCard.append(this.button("HTTPS esterno",()=>{this.qrMode="https";this.render();}));
    modeCard.append(this.button("LAN / Wi-Fi locale",()=>{this.qrMode="lan";this.render();}));
    grid.append(modeCard);
-   const publicCard=this.card("QR HTTPS esterno · 10 minuti / un utilizzo");
+   const publicCard=this.card("QR di accesso · HTTPS");
    const externalUrl=this._hass?.config?.external_url||"";
    publicCard.append(this.node("p",externalUrl
      ?"Indirizzo esterno Home Assistant (automatico): "+externalUrl
@@ -153,7 +153,7 @@ class ClBbManagerPanel extends HTMLElement {
    const publicForm=this.node("form");
    this.select(publicForm,"Varco virtuale","gate_id",
      gates.map(g=>[g.id,g.name]),this.demoTargetGateId||gates[0].id);
-   const makePublic=this.node("button","Genera QR HTTPS di prova");
+   const makePublic=this.node("button","Genera QR di accesso");
    makePublic.type="submit";
    publicForm.append(makePublic);
    publicForm.onsubmit=async event=>{
@@ -187,10 +187,10 @@ class ClBbManagerPanel extends HTMLElement {
      img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(this.publicQR.svg);
      img.width=220;
      img.height=220;
-     img.alt="QR HTTPS temporaneo per "+this.publicQR.gate;
+     img.alt="QR di accesso per "+this.publicQR.gate;
      preview.append(img);
      preview.append(this.node("p","Usa una sola volta, entro 10 minuti. Non condividere il QR pubblicamente.","small"));
-     const link=this.node("a","Apri la prova HTTPS");
+     const link=this.node("a","Apri pagina di accesso");
      link.href=this.publicQR.url;
      link.target="_blank";
      link.rel="noreferrer noopener";
@@ -198,7 +198,7 @@ class ClBbManagerPanel extends HTMLElement {
      publicCard.append(preview);
    }
    if(this.qrMode==="https")grid.append(publicCard);
-   const qrCard=this.card("QR LAN / Wi-Fi locale · 10 minuti");
+   const qrCard=this.card("QR di accesso · rete locale");
    qrCard.append(this.node(
      "p",
      "Questo QR usa il percorso /demo/, dura 10 minuti e richiede il PIN. " +
@@ -210,7 +210,7 @@ class ClBbManagerPanel extends HTMLElement {
    this.select(qrForm,"Varco virtuale","gate_id",gates.map(g=>[g.id,g.name]),this.demoTargetGateId||gates[0].id);
    const address=this.field(qrForm,"URL interno Home Assistant","base_url","url",this._hass?.config?.internal_url||"");
    address.placeholder="http://192.168.1.100:8123";
-   const create=this.node("button","Genera QR demo");
+   const create=this.node("button","Genera QR locale");
    create.type="submit";
    qrForm.append(create);
    qrForm.onsubmit=async event=>{
@@ -246,7 +246,7 @@ class ClBbManagerPanel extends HTMLElement {
        img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(this.demoQR.svg);
        img.width=220;
        img.height=220;
-       img.alt="QR di collaudo temporaneo per "+this.demoQR.gate;
+       img.alt="QR temporaneo per "+this.demoQR.gate;
        preview.append(img);
        preview.append(this.node("p","Scansiona il QR con lo smartphone connesso alla stessa rete locale.","small"));
        const link=this.node("a","Apri il collegamento di prova");
@@ -261,10 +261,10 @@ class ClBbManagerPanel extends HTMLElement {
      }
    }
    if(this.qrMode==="lan")grid.append(qrCard);
-   const info=this.card("Stato di sicurezza");
-   info.append(this.node("p","Portale QR ospiti: disattivato","small"),
+   const info=this.card("Sicurezza e configurazione");
+   info.append(this.node("p","Portale permanente: disattivato","small"),
                this.node("p","Target consentiti: cinque script virtuali demo","small"),
-               this.node("p","Attivazione comandi reali: non prevista in questa versione","small"));
+               this.node("p","Comandi verso serrature fisiche: disattivati","small"));
    grid.append(info);
  }
  events(grid){const card=this.card("Registro modifiche");for(const event of [...this.data.events].reverse()){const row=this.node("div","","item");row.append(this.node("strong",event.event),this.node("p",new Date(event.at).toLocaleString("it-IT")+" · "+event.details,"small"));card.append(row);}grid.append(card);}
