@@ -34,10 +34,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Create CL B&B Manager alpha integration ZIP
-        run: zip -r CL-BB-Manager-0.5.0-alpha.4.zip custom_components/cl_bb_manager -x '*.pyc' -x '*/__pycache__/*'
+        run: zip -r CL-BB-Manager-0.5.0-alpha.5.zip custom_components/cl_bb_manager -x '*.pyc' -x '*/__pycache__/*'
       - uses: actions/upload-artifact@v4
         with:
-          name: CL-BB-Manager-0.5.0-alpha.4-install
-          path: CL-BB-Manager-0.5.0-alpha.4.zip
+          name: CL-BB-Manager-0.5.0-alpha.5-install
+          path: CL-BB-Manager-0.5.0-alpha.5.zip
           if-no-files-found: error
           retention-days: 30
