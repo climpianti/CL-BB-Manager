@@ -1,6 +1,6 @@
 # CL B&B Manager
 
-**Versione 0.5.0-alpha.2 — collaudo QR/PIN virtuale su LAN e HTTPS opzionale. Non per accessi reali in produzione.**
+**Versione 0.5.0-alpha.3 — collaudo QR/PIN virtuale su LAN e HTTPS opzionale. Non per accessi reali in produzione.**
 
 Integrazione custom per Home Assistant, progettata da CL Impianti per la gestione di varchi, camere e prenotazioni nei B&B.
 
@@ -51,6 +51,14 @@ In **Impostazioni → Dispositivi e servizi → CL B&B Manager → Configura**, 
 - Non è consentito l'uso con serrature o attuatori fisici; non collegare gli script virtuali a comandi hardware.
 - La verifica dell'interfaccia su smartphone e il test completo sul server reale sono richiesti prima di considerare completata la fase alpha.
 - Per un prodotto commerciale restano da implementare protezione del proxy HTTPS, sessioni ospiti di produzione, ruoli gestore/installatore, GDPR, backup, audit e fail-safe.
+
+## Interfaccia CL Control · BlueTech Glass
+
+Il pannello amministrativo e la pagina PIN/QR temporanea utilizzano il design system **CL Control Blue Tech Premium**, adattato in stile glassmorphism (blu notte `#061324`, ciano `#19baff`, verde `#32e394`), con card traslucide, interazioni accessibili e layout responsive.
+
+La navigazione del pannello comprende **Panoramica, Prenotazioni, Accessi, Varchi, Registro e Impostazioni**. Il collegamento HTTPS usa l'URL esterno configurato in Home Assistant; il QR locale rimane opzionale. La pagina ospite visualizza un form PIN più chiaro e messaggi di esito semplificati.
+
+**Nota di sicurezza:** le diciture orientate al cliente non trasformano questa release alpha in un sistema di apertura fisica. Sono consentite soltanto simulazioni tramite script virtuali. Il portale permanente `/guest/` continua a restituire 404. I PIN e i QR temporanei non devono essere condivisi pubblicamente.
 
 ## Test
 
