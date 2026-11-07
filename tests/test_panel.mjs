@@ -108,3 +108,13 @@ test("Operatori consultano il registro accessi e non la configurazione tecnica",
   assert.ok(source.includes('Intestatario prenotazione (facoltativo)'));
   assert.ok(source.includes('guest_name:String(data.get("guest_name")||"").trim()'));
 });
+
+
+test("LAN e Internet hanno contenitore responsive e selezione leggibile",()=>{
+  const css=readFileSync("custom_components/cl_bb_manager/frontend/bluetech-glass.css","utf8");
+  assert.ok(source.includes('this.node("div","","connection-modes")'));
+  assert.ok(source.includes('internet.setAttribute("aria-pressed"'));
+  assert.ok(source.includes('local.setAttribute("aria-pressed"'));
+  assert.ok(css.includes(".connection-modes{display:grid"));
+  assert.ok(css.includes("grid-template-columns:minmax(0,1fr);gap:14px"));
+});
