@@ -87,3 +87,21 @@ def valid_demo_session(session: dict | None, host: str, peer: str, now: float | 
         and host.lower() == session.get("host")
         and is_lan_peer(peer)
     )
+
+
+def valid_form_origin(origin: str | None, fetch_site: str | None, expected_origin: str) -> bool:
+    """Accept mobile form submissions with per-session CSRF already verified.
+
+    A browser's Sec-Fetch-Site header is browser controlled. With a verified
+    QR session and hidden CSRF token, a missing or opaque Origin is safe for
+    the LAN demo; explicit cross-site navigations remain forbidden.
+    """
+    if fetch_site == "cross-site":
+        return False
+    if origin is None or origin == "null":
+        return True
+    if origin.lower() == expected_origin:
+        return True
+    # Android and reverse-proxy browsers may disagree on the displayed scheme.
+    # Require browser-confirmed same-origin navigation, as well as CSRF.
+    return fetch_site == "same-origin"
