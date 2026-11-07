@@ -8,6 +8,7 @@ const source = readFileSync("custom_components/cl_bb_manager/frontend/panel.js",
 runInNewContext(source, {
   HTMLElement: class {},
   customElements: {
+    get(name) { return undefined; },
     define(name, ctor) {
       if (name === "cl-bb-manager-panel") Panel = ctor;
     },
