@@ -145,8 +145,13 @@ class ClBbManagerPanel extends HTMLElement {
    grid.append(card);
    const modeCard=this.card("Connessione");
    modeCard.append(this.node("p","Per accedere da Internet viene utilizzato l'URL esterno configurato in Home Assistant. Seleziona la rete locale solo per accessi dalla stessa Wi-Fi.","small"));
-   modeCard.append(this.button("Accesso da Internet",()=>{this.qrMode="https";this.render();}));
-   modeCard.append(this.button("Rete locale / Wi-Fi",()=>{this.qrMode="lan";this.render();}));
+   const modes=this.node("div","","connection-modes");
+   const internet=this.button("Accesso da Internet",()=>{this.qrMode="https";this.render();});
+   internet.setAttribute("aria-pressed",String(this.qrMode==="https"));
+   const local=this.button("Rete locale / Wi-Fi",()=>{this.qrMode="lan";this.render();});
+   local.setAttribute("aria-pressed",String(this.qrMode==="lan"));
+   modes.append(internet,local);
+   modeCard.append(modes);
    grid.append(modeCard);
    const publicCard=this.card("QR di accesso · HTTPS");
    const externalUrl=this._hass?.config?.external_url||"";
