@@ -91,7 +91,7 @@ class FakeHass:
 
 class FakeRequest:
     def __init__(self, hass, pin=None, peer="192.168.1.56",
-                 host="192.168.1.100:8123", origin=None, csrf_override=None):
+                 host="192.168.1.100:8123", origin=None, csrf_override=None, fetch_site=None):
         self.app = {"hass": hass}
         self.remote = peer
         self.host = host
@@ -100,6 +100,8 @@ class FakeRequest:
             {} if origin is False
             else {"Origin": "http://192.168.1.100:8123" if origin is None else origin}
         )
+        if fetch_site is not None:
+            self.headers["Sec-Fetch-Site"] = fetch_site
         manager = hass.data[const.DOMAIN]["manager"]
         session = next(iter(manager.demo_sessions.values()))
         self.csrf = session["form_csrf"] if csrf_override is None else csrf_override
@@ -139,6 +141,8 @@ def test_valid_pin_simulates_only_allowlisted_virtual_script():
         assert "Camera 1" in response.text
         result = await demo_http.DemoPortalView().post(request, token)
         assert result.status == 200
+        assert "Comando virtuale inviato" in result.text
+        assert "name='pin'" not in result.text
         assert len(hass.calls) == 1
         assert hass.calls[0][0:3] == (
             "script", "turn_on",
@@ -241,5 +245,62 @@ def test_cross_site_origin_with_correct_csrf_is_still_blocked():
         result = await demo_http.DemoPortalView().post(request, token)
         assert result.status == 403
         assert "Origine non autorizzata" in result.text
+        assert not hass.calls
+    asyncio.run(run())
+
+def test_opaque_android_origin_with_csrf_is_accepted_on_lan():
+    async def run():
+        _, hass, token = make_fixture()
+        result = await demo_http.DemoPortalView().post(
+            FakeRequest(
+                hass, pin="12345678", origin="null",
+                fetch_site="same-origin"
+            ), token
+        )
+        assert result.status == 200
+        assert len(hass.calls) == 1
+    asyncio.run(run())
+
+
+def test_reported_origin_mismatch_with_browser_same_origin_and_csrf_is_accepted():
+    async def run():
+        _, hass, token = make_fixture()
+        result = await demo_http.DemoPortalView().post(
+            FakeRequest(
+                hass, pin="12345678", origin="http://192.168.1.100",
+                fetch_site="same-origin"
+            ), token
+        )
+        assert result.status == 200
+        assert len(hass.calls) == 1
+    asyncio.run(run())
+
+
+def test_explicit_cross_site_fetch_metadata_blocks_even_with_valid_csrf():
+    async def run():
+        _, hass, token = make_fixture()
+        result = await demo_http.DemoPortalView().post(
+            FakeRequest(
+                hass, pin="12345678", origin="http://192.168.1.100:8123",
+                fetch_site="cross-site"
+            ), token
+        )
+        assert result.status == 403
+        assert "Origine non autorizzata" in result.text
+        assert not hass.calls
+    asyncio.run(run())
+
+
+def test_csrf_is_required_even_for_android_opaque_origin():
+    async def run():
+        _, hass, token = make_fixture()
+        result = await demo_http.DemoPortalView().post(
+            FakeRequest(
+                hass, pin="12345678", origin="null",
+                fetch_site="same-origin", csrf_override="bad-token"
+            ), token
+        )
+        assert result.status == 403
+        assert "Sessione del modulo non valida" in result.text
         assert not hass.calls
     asyncio.run(run())
