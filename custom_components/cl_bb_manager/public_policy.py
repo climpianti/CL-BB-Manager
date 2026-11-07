@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 PUBLIC_DEMO_SECONDS = 600
 MAX_PUBLIC_SESSIONS = 5
 _DNS_NAME = re.compile(
-    r"(?i)^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+"
+    r"(?i)^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
     r"[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$"
 )
 
