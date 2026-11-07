@@ -15,7 +15,7 @@ class ClBbManagerPanel extends HTMLElement {
  style.textContent="@import url('/cl_bb_manager_static/bluetech-glass.css?v=0.5.0-alpha.6');";root.append(style);
  const page=this.node("main","","page");root.append(page);const hero=this.node("header","","hero");
  const brand=this.node("div","","hero-brand");
- const logo=this.node("img");logo.src="/cl_bb_manager_static/cl-impianti-logo.svg?v=0.5.0-alpha.5";logo.alt="CL Impianti";logo.className="brand-logo";logo.decoding="async";brand.append(logo);
+ const logo=this.node("img");logo.src="/cl_bb_manager_static/cl-impianti-logo.svg?v=0.5.0-alpha.6";logo.alt="CL Impianti";logo.className="brand-logo";logo.decoding="async";brand.append(logo);
  const brandText=this.node("span","","brand-word");
  brandText.append(this.node("strong","CL CONTROL"),this.node("small","Hospitality · Access Manager"));
  brand.append(brandText);
