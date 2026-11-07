@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "CL B&B Manager",
-        "description": "Configura il nome della struttura. I varchi e il portale QR saranno inizialmente disabilitati.",
+        "description": "Configura la struttura per la gestione di prenotazioni e codici di accesso. I varchi saranno inizialmente inattivi.",
         "data": {
           "structure_name": "Nome della struttura"
         }
@@ -16,11 +16,11 @@
   "options": {
     "step": {
       "init": {
-        "title": "Collaudo HTTPS solo virtuale",
-        "description": "Consenti QR monouso validi 10 minuti, esclusivamente con i cinque script virtuali demo. Imposta il dominio HTTPS di questa struttura. Non abilita il portale permanente.",
+        "title": "Accesso temporaneo HTTPS",
+        "description": "Configura il collegamento HTTPS per i codici QR temporanei. L'URL esterno viene letto dalle impostazioni di rete di Home Assistant. Modalità pilota: sono consentiti solo varchi virtuali; non abilita il portale permanente.",
         "data": {
-          "public_pilot_enabled": "Abilita collaudo QR temporaneo via HTTPS",
-          "public_pilot_origin": "Origine pubblica HTTPS (es. https://b-b.esempio.it)"
+          "public_pilot_enabled": "Abilita accesso temporaneo HTTPS",
+          "public_pilot_origin": "Indirizzo pubblico HTTPS (automatico da Home Assistant)"
         }
       }
     },
