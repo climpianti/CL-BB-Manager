@@ -119,3 +119,9 @@ a:hover{color:#c5f0ff}
  .dashboard-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-top:24px}
  .dashboard-actions button{width:100%;min-height:52px;white-space:normal}
 }
+
+/* Distinct and touch-friendly LAN/Internet selector on mobile. */
+.connection-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0 4px}
+.connection-modes button{width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;min-height:54px;padding:12px 10px;box-shadow:none}
+.connection-modes button[aria-pressed="true"]{border-color:#32e394;background:linear-gradient(115deg,#126581,#0e5267);box-shadow:inset 0 0 0 1px #32e39450}
+@media(max-width:740px){.connection-modes{grid-template-columns:minmax(0,1fr);gap:14px}.connection-modes button{min-height:54px}}
