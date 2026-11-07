@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .api import register_commands
+from .access_history import public_access_history
 from .guest import GuestView
 from .demo_http import DemoPortalView
 from .public_http import PublicPilotView
@@ -33,14 +34,14 @@ class BBManager:
         # Deliberately not persisted across HA restarts.
         self.demo_sessions = {}
         self.public_demo_sessions = {}
-        self.data = {"gates": [], "bookings": [], "events": []}
+        self.data = {"gates": [], "bookings": [], "events": [], "access_history": []}
 
     async def async_load(self):
         """Load persistent data after Home Assistant starts."""
         saved = await self.store.async_load()
         if saved is not None:
             self.data = saved
-        for key in ("gates", "bookings", "events"):
+        for key in ("gates", "bookings", "events", "access_history"):
             self.data.setdefault(key, [])
 
     async def async_save(self):
@@ -57,7 +58,7 @@ class BBManager:
         self.data["events"] = self.data["events"][-MAX_EVENTS:]
 
     def summary(self, role: str = "admin"):
-        """Return minimal panel data; operators do not receive HA mappings or audit."""
+        """Return minimal panel data with booking-scoped access history."""
         from .guest import DEMO_SCRIPTS
 
         is_admin = role == "admin"
@@ -83,6 +84,7 @@ class BBManager:
             "gates": gates,
             "bookings": [public_booking(b) for b in self.data["bookings"]],
             "events": list(self.data["events"][-MAX_EVENTS:]) if is_admin else [],
+            "access_history": public_access_history(self.data),
             "role": role,
             "guest_portal": "disabled",
             "public_pilot": "enabled" if self.entry.options.get("public_pilot_enabled", False) else "disabled",
