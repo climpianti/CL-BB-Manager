@@ -91,18 +91,24 @@ class FakeHass:
 
 class FakeRequest:
     def __init__(self, hass, pin=None, peer="192.168.1.56",
-                 host="192.168.1.100:8123", origin=None):
+                 host="192.168.1.100:8123", origin=None, csrf_override=None):
         self.app = {"hass": hass}
         self.remote = peer
         self.host = host
         self.scheme = "http"
-        self.headers = {"Origin": origin or "http://192.168.1.100:8123"}
+        self.headers = (
+            {} if origin is False
+            else {"Origin": "http://192.168.1.100:8123" if origin is None else origin}
+        )
+        manager = hass.data[const.DOMAIN]["manager"]
+        session = next(iter(manager.demo_sessions.values()))
+        self.csrf = session["form_csrf"] if csrf_override is None else csrf_override
         self.content_length = 12
         self.content_type = "application/x-www-form-urlencoded"
         self.pin = pin
 
     async def post(self):
-        return {"pin": self.pin}
+        return {"pin": self.pin, "form_csrf": self.csrf}
 
 
 def make_fixture(pin="12345678", gate_ids=None, revoked=False):
@@ -184,10 +190,11 @@ def test_session_expiration_and_public_peer_are_denied():
 def test_wrong_origin_rejected_before_pin_check():
     async def run():
         _, hass, token = make_fixture()
-        with pytest.raises(web.HTTPForbidden):
-            await demo_http.DemoPortalView().post(
-                FakeRequest(hass, pin="12345678", origin="http://evil.example"), token
-            )
+        rejected = await demo_http.DemoPortalView().post(
+            FakeRequest(hass, pin="12345678", origin="http://evil.example"), token
+        )
+        assert rejected.status == 403
+        assert "Origine non autorizzata" in rejected.text
         assert not hass.calls
     asyncio.run(run())
 
@@ -201,5 +208,38 @@ def test_rate_limit_prevents_sixth_attempt():
             assert result.status == 403
         result = await portal.post(FakeRequest(hass, pin="00000000"), token)
         assert result.status == 429
+        assert not hass.calls
+    asyncio.run(run())
+
+def test_mobile_browser_without_origin_can_submit_form_with_csrf():
+    async def run():
+        manager, hass, token = make_fixture()
+        request = FakeRequest(hass, pin="12345678", origin=False)
+        result = await demo_http.DemoPortalView().post(request, token)
+        assert result.status == 200
+        assert len(hass.calls) == 1
+    asyncio.run(run())
+
+
+def test_originless_form_without_csrf_is_blocked():
+    async def run():
+        manager, hass, token = make_fixture()
+        request = FakeRequest(
+            hass, pin="12345678", origin=False, csrf_override="incorrect",
+        )
+        result = await demo_http.DemoPortalView().post(request, token)
+        assert result.status == 403
+        assert "Sessione del modulo non valida" in result.text
+        assert not hass.calls
+    asyncio.run(run())
+
+
+def test_cross_site_origin_with_correct_csrf_is_still_blocked():
+    async def run():
+        manager, hass, token = make_fixture()
+        request = FakeRequest(hass, pin="12345678", origin="https://other.example")
+        result = await demo_http.DemoPortalView().post(request, token)
+        assert result.status == 403
+        assert "Origine non autorizzata" in result.text
         assert not hass.calls
     asyncio.run(run())
