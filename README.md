@@ -1,12 +1,12 @@
 # CL B&B Manager
 
-**Versione 0.5.0-alpha.4 — collaudo QR/PIN virtuale su LAN e HTTPS opzionale. Non per accessi reali in produzione.**
+**Versione 0.5.0-alpha.6 — collaudo QR/PIN virtuale su LAN e HTTPS opzionale. Non per accessi reali in produzione.**
 
 Integrazione custom per Home Assistant, progettata da CL Impianti per la gestione di varchi, camere e prenotazioni nei B&B.
 
 ## Funzioni oggi presenti
 
-- **Pannello amministrativo** in Home Assistant, sezioni *Varchi*, *Prenotazioni*, *Registro* e *Collaudo accessi*.
+- **Pannello amministrativo** in Home Assistant con *Panoramica*, *Prenotazioni*, *Accessi*, *Varchi*, *Registro* e *Impostazioni*.
 - **Varchi dinamici**: aggiungi, configura, modifica e disabilita varchi comuni o privati; fino a 200 in questa alpha.
 - **Prenotazioni con PIN** numerico di 8 cifre: check-in, check-out, elenco di varchi autorizzati, revoca immediata e PIN salvato soltanto come hash salato.
 - **QR permanenti /guest/** non attivi. Nel pannello Varchi si accede ora alla generazione di un **QR prova (LAN)** temporaneo; non consegnare QR agli ospiti reali.
@@ -72,6 +72,16 @@ node --check custom_components/cl_bb_manager/frontend/panel.js
 La pipeline GitHub Actions ripete i controlli a ogni push.
 
 Repository pubblico per collaudo; licenza non ancora definita. Consulta [Roadmap](docs/ROADMAP.md) e [Sicurezza](docs/SECURITY.md).
+
+## Impostazioni e varchi (0.5.0-alpha.6)
+
+Da **Home Assistant → Impostazioni → Dispositivi e servizi → CL B&B Manager → Configura** si apre un menu con:
+
+- **Accesso HTTPS e operatori**: mostra i nomi degli operatori già salvati, preseleziona i relativi account Home Assistant quando riapri la pagina e permette di aggiornarne l'elenco (massimo 20 utenti non amministratori attivi). Gli amministratori hanno già accesso senza selezione. Gli operatori non possono modificare le configurazioni dei varchi.
+- **Gestione varchi → Aggiungi varco**: seleziona un'entità Home Assistant esistente (script/button/lock), indica l'azione coerente e il tipo. Il nuovo varco è sempre creato **disattivato**, per verifica e successiva abilitazione dal pannello amministrativo.
+- **Gestione varchi → Elimina varco**: seleziona un varco esistente e conferma in una seconda schermata. Il server impedisce la rimozione finché sono associate prenotazioni non revocate e non scadute. Il comando elimina solo la mappatura nel gestionale; **non elimina le entità Home Assistant né comanda dispositivi**.
+
+Le modifiche sono applicate alla configurazione dell'integrazione e allo storage gestito da HA; non modificano PIN o token in chiaro. La modalità di accesso pubblico permanente resta disattivata e l'apertura è consentita solo ai cinque script virtuali approvati nel pilot.
 
 ## Scelta automatica dell'indirizzo QR
 

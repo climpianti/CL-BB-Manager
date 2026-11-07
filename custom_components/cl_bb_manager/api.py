@@ -11,6 +11,7 @@ import voluptuous as vol
 
 from .const import DOMAIN, MAX_BOOKINGS, MAX_GATES
 from .models import as_utc, generate_pin, make_booking, make_gate, pin_matches
+from .gate_management import check_gate_removal
 from .permissions import user_role
 from .security import charge_attempt, demo_target_allowed, candidate_bookings
 
@@ -148,12 +149,7 @@ def register_commands(hass):
                 )
                 if gate is None:
                     raise ValueError("Varco inesistente.")
-                now = datetime.now(timezone.utc)
-                if any(not b["revoked"]
-                       and gate["id"] in b["gate_ids"]
-                       and as_utc(b["end"]) > now
-                       for b in manager.data["bookings"]):
-                    raise ValueError("Revocare prima le prenotazioni future associate.")
+                check_gate_removal(gate["id"], manager.data["bookings"])
                 manager.data["gates"].remove(gate)
                 manager.audit("gate_removed", gate["name"])
                 await manager.async_save()
