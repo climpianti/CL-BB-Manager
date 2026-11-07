@@ -11,6 +11,7 @@ from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 
 from .const import DOMAIN
+from .access_history import add_access_event
 from .demo_http import _response
 from .demo_policy import valid_form_origin
 from .guest import DEMO_SCRIPTS
@@ -108,6 +109,7 @@ class PublicPilotView(HomeAssistantView):
 
             if not (len(pin) == 8 and pin.isascii() and pin.isdecimal()):
                 manager.audit("public_pilot_denied", gate["id"])
+                add_access_event(manager.data, source="https", result="denied", gate=gate)
                 await manager.async_save()
                 return _response(gate["name"], "Codice non valido o scaduto.", 403)
             try:
@@ -117,13 +119,14 @@ class PublicPilotView(HomeAssistantView):
             except ValueError as exc:
                 raise web.HTTPServiceUnavailable() from exc
 
-            authorized = False
+            matched_booking = None
             for booking in bookings:
                 if await hass.async_add_executor_job(pin_matches, pin, booking):
-                    authorized = True
+                    matched_booking = booking
                     break
-            if not authorized:
+            if matched_booking is None:
                 manager.audit("public_pilot_denied", gate["id"])
+                add_access_event(manager.data, source="https", result="denied", gate=gate)
                 await manager.async_save()
                 return _response(gate["name"], "Codice non valido o scaduto.", 403)
 
@@ -139,6 +142,10 @@ class PublicPilotView(HomeAssistantView):
             # Single-use after *successful* command: no second opening.
             manager.public_demo_sessions.pop(token, None)
             manager.audit("public_pilot_open", gate["id"])
+            add_access_event(
+                manager.data, source="https", result="authorized",
+                gate=gate, booking=matched_booking,
+            )
             await manager.async_save()
         return _response(
             gate["name"], "Accesso autorizzato.",

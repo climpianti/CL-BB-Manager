@@ -84,3 +84,27 @@ test("Logo CL Impianti ufficiale integrato in pannello e pagina accessi", () => 
   assert.ok(logo.includes('viewBox="355 90 840 750"'));
   assert.ok(logo.includes('data:image/png;base64,'));
 });
+
+test("Operatori vedono solo prenotazioni e accessi, non configurazione varchi", () => {
+  assert.ok(source.includes('this.data.role!=="admin"'));
+  assert.ok(source.includes('["varchi","impostazioni"].includes(id)'));
+  assert.ok(source.includes('if(this.data.role==="admin"){'));
+  assert.ok(source.includes('g.demo_allowed===true'));
+  assert.ok(source.includes('this.api("public_pilot_qr"'));
+  assert.ok(source.includes('this.api("demo_qr"'));
+});
+
+test("L'interfaccia non usa l'account locale per decidere i diritti", () => {
+  assert.ok(!source.includes('this._hass.user.is_admin'));
+  assert.ok(!source.includes('this._hass?.user?.is_admin'));
+  assert.ok(source.includes('this.data.role'));
+});
+
+test("Operatori consultano il registro accessi e non la configurazione tecnica", () => {
+  assert.ok(source.includes('const history=this.card("Registro accessi")'));
+  assert.ok(source.includes('this.data.access_history||[]'));
+  assert.ok(source.includes('if(this.data.role!=="admin")return;'));
+  assert.ok(source.includes('entry.guest_name||entry.room'));
+  assert.ok(source.includes('Intestatario prenotazione (facoltativo)'));
+  assert.ok(source.includes('guest_name:String(data.get("guest_name")||"").trim()'));
+});

@@ -1,4 +1,4 @@
-"""Admin-only websocket API for dynamic gates and reservations.
+"""Role-aware websocket API for CL B&B Manager.
 
 The API intentionally contains NO service calls for opening gates in this alpha.
 """
@@ -11,6 +11,7 @@ import voluptuous as vol
 
 from .const import DOMAIN, MAX_BOOKINGS, MAX_GATES
 from .models import as_utc, generate_pin, make_booking, make_gate, pin_matches
+from .permissions import user_role
 from .security import charge_attempt, demo_target_allowed, candidate_bookings
 
 
@@ -18,14 +19,21 @@ def _manager(hass):
     return hass.data.get(DOMAIN, {}).get("manager")
 
 
-def _authorize(hass, connection, msg):
-    if connection.user is None or not connection.user.is_admin:
-        connection.send_error(msg["id"], "unauthorized", "Solo amministratori.")
-        return None
+def _authorize(hass, connection, msg, *, admin_only=False):
     manager = _manager(hass)
     if manager is None:
         connection.send_error(msg["id"], "not_ready", "Gestore non configurato.")
+        return None
+    role = user_role(connection.user, manager.entry.options)
+    if role is None or (admin_only and role != "admin"):
+        connection.send_error(msg["id"], "unauthorized", "Utente non autorizzato.")
+        return None
     return manager
+
+
+def _summary(manager, connection):
+    """Return a scoped snapshot based on the authenticated user, not client data."""
+    return manager.summary(role=user_role(connection.user, manager.entry.options))
 
 
 def _error(connection, msg, reason):
@@ -50,7 +58,7 @@ def register_commands(hass):
     async def get_list(hass, connection, msg):
         manager = _authorize(hass, connection, msg)
         if manager is not None:
-            connection.send_result(msg["id"], manager.summary())
+            connection.send_result(msg["id"], _summary(manager, connection))
 
     @websocket_api.websocket_command({
         "type": "cl_bb_manager/add_gate",
@@ -61,7 +69,7 @@ def register_commands(hass):
     })
     @websocket_api.async_response
     async def add_gate(hass, connection, msg):
-        manager = _authorize(hass, connection, msg)
+        manager = _authorize(hass, connection, msg, admin_only=True)
         if manager is None:
             return
         try:
@@ -78,7 +86,7 @@ def register_commands(hass):
         except ValueError as err:
             _error(connection, msg, err)
             return
-        connection.send_result(msg["id"], manager.summary())
+        connection.send_result(msg["id"], _summary(manager, connection))
 
     @websocket_api.websocket_command({
         "type": "cl_bb_manager/update_gate",
@@ -91,7 +99,7 @@ def register_commands(hass):
     })
     @websocket_api.async_response
     async def update_gate(hass, connection, msg):
-        manager = _authorize(hass, connection, msg)
+        manager = _authorize(hass, connection, msg, admin_only=True)
         if manager is None:
             return
         try:
@@ -121,7 +129,7 @@ def register_commands(hass):
         except ValueError as err:
             _error(connection, msg, err)
             return
-        connection.send_result(msg["id"], manager.summary())
+        connection.send_result(msg["id"], _summary(manager, connection))
 
     @websocket_api.websocket_command({
         "type": "cl_bb_manager/remove_gate",
@@ -129,7 +137,7 @@ def register_commands(hass):
     })
     @websocket_api.async_response
     async def remove_gate(hass, connection, msg):
-        manager = _authorize(hass, connection, msg)
+        manager = _authorize(hass, connection, msg, admin_only=True)
         if manager is None:
             return
         try:
@@ -152,11 +160,12 @@ def register_commands(hass):
         except ValueError as err:
             _error(connection, msg, err)
             return
-        connection.send_result(msg["id"], manager.summary())
+        connection.send_result(msg["id"], _summary(manager, connection))
 
     @websocket_api.websocket_command({
         "type": "cl_bb_manager/add_booking",
         vol.Required("room"): str,
+        vol.Optional("guest_name", default=""): str,
         vol.Required("start"): str,
         vol.Required("end"): str,
         vol.Required("gate_ids"): [str],
@@ -171,7 +180,7 @@ def register_commands(hass):
             # PBKDF2 hashing runs on the executor, not the Home Assistant loop.
             booking = await hass.async_add_executor_job(
                 make_booking, msg["room"], msg["start"],
-                msg["end"], msg["gate_ids"], pin
+                msg["end"], msg["gate_ids"], pin, msg.get("guest_name", "")
             )
             if as_utc(booking["end"]) <= datetime.now(timezone.utc):
                 raise ValueError("Check-out già trascorso.")
@@ -188,8 +197,8 @@ def register_commands(hass):
         except (ValueError, OverflowError) as err:
             _error(connection, msg, err)
             return
-        # PIN sent only to this authenticated admin in the creation response.
-        connection.send_result(msg["id"], {"pin_once": pin, "data": manager.summary()})
+        # PIN is returned once to the authenticated administrator or selected operator.
+        connection.send_result(msg["id"], {"pin_once": pin, "data": _summary(manager, connection)})
 
     @websocket_api.websocket_command({
         "type": "cl_bb_manager/revoke_booking",
@@ -212,7 +221,7 @@ def register_commands(hass):
         except ValueError as err:
             _error(connection, msg, err)
             return
-        connection.send_result(msg["id"], manager.summary())
+        connection.send_result(msg["id"], _summary(manager, connection))
 
     @websocket_api.websocket_command({
         "type": "cl_bb_manager/qr",
@@ -221,7 +230,7 @@ def register_commands(hass):
     })
     @websocket_api.async_response
     async def get_qr(hass, connection, msg):
-        manager = _authorize(hass, connection, msg)
+        manager = _authorize(hass, connection, msg, admin_only=True)
         if manager is None:
             return
         # Use an operator-provided HTTPS public URL. No internal tokens or
@@ -277,7 +286,7 @@ def register_commands(hass):
         """
         from .guest import DEMO_SCRIPTS
 
-        manager = _authorize(hass, connection, msg)
+        manager = _authorize(hass, connection, msg, admin_only=True)
         if manager is None:
             return
         pin = msg["pin"]

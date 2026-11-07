@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .api import register_commands
+from .access_history import public_access_history
 from .guest import GuestView
 from .demo_http import DemoPortalView
 from .public_http import PublicPilotView
@@ -33,14 +34,14 @@ class BBManager:
         # Deliberately not persisted across HA restarts.
         self.demo_sessions = {}
         self.public_demo_sessions = {}
-        self.data = {"gates": [], "bookings": [], "events": []}
+        self.data = {"gates": [], "bookings": [], "events": [], "access_history": []}
 
     async def async_load(self):
         """Load persistent data after Home Assistant starts."""
         saved = await self.store.async_load()
         if saved is not None:
             self.data = saved
-        for key in ("gates", "bookings", "events"):
+        for key in ("gates", "bookings", "events", "access_history"):
             self.data.setdefault(key, [])
 
     async def async_save(self):
@@ -56,19 +57,35 @@ class BBManager:
         })
         self.data["events"] = self.data["events"][-MAX_EVENTS:]
 
-    def summary(self):
-        """Return a redacted and detached representation to the manager UI."""
-        gates = [
-            {key: gate[key] for key in (
-                "id", "name", "entity_id", "action", "kind", "enabled"
-            )}
-            for gate in self.data["gates"]
-        ]
+    def summary(self, role: str = "admin"):
+        """Return minimal panel data with booking-scoped access history."""
+        from .guest import DEMO_SCRIPTS
+
+        is_admin = role == "admin"
+        gates = []
+        for gate in self.data["gates"]:
+            item = {
+                key: gate[key] for key in (
+                    "id", "name", "kind", "enabled"
+                )
+            }
+            item["demo_allowed"] = bool(
+                gate.get("enabled")
+                and gate.get("action") == "script.turn_on"
+                and gate.get("entity_id") in DEMO_SCRIPTS
+            )
+            if is_admin:
+                item.update({
+                    key: gate[key] for key in ("entity_id", "action")
+                })
+            gates.append(item)
         return {
             "structure": self.entry.data.get("structure_name", "B&B"),
             "gates": gates,
             "bookings": [public_booking(b) for b in self.data["bookings"]],
-            "events": list(self.data["events"][-MAX_EVENTS:]),
+            "events": list(self.data["events"][-MAX_EVENTS:]) if is_admin else [],
+            "access_history": public_access_history(self.data),
+            "role": role,
             "guest_portal": "disabled",
             "public_pilot": "enabled" if self.entry.options.get("public_pilot_enabled", False) else "disabled",
             "hardware_control": "disabled",
@@ -76,7 +93,7 @@ class BBManager:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
-    """Set up the integration, admin-only panel and API."""
+    """Set up the integration, restricted panel and permission-checked API."""
     domain_data = hass.data.setdefault(DOMAIN, {})
     manager = BBManager(hass, entry)
     await manager.async_load()
@@ -101,9 +118,11 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         frontend_url_path=PANEL_PATH,
         webcomponent_name="cl-bb-manager-panel",
         module_url=PANEL_RESOURCE,
-        sidebar_title="CL B&B Manager",
+        # Avoid advertising a panel that should only be reached by Core's
+        # per-user shortcut. All WebSocket actions enforce the operator ACL.
+        sidebar_title=None,
         sidebar_icon="mdi:bed",
-        require_admin=True,
+        require_admin=False,
         config_panel_domain=DOMAIN,
     )
     return True

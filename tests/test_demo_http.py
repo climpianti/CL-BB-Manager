@@ -150,6 +150,12 @@ def test_valid_pin_simulates_only_allowlisted_virtual_script():
         )
         assert manager.saves >= 2
         assert "12345678" not in str(manager.data["events"])
+        record=manager.data["access_history"][-1]
+        assert record["source"]=="lan"
+        assert record["result"]=="authorized"
+        assert record["room"]=="Camera 1"
+        assert record["booking_id"]==manager.data["bookings"][0]["id"]
+        assert "12345678" not in str(record)
     asyncio.run(run())
 
 
@@ -170,6 +176,8 @@ def test_denies_ineligible_guest_without_opening(mode):
         )
         assert result.status == 403
         assert not hass.calls
+        assert manager.data["access_history"][-1]["result"]=="denied"
+        assert not manager.data["access_history"][-1]["booking_id"]
     asyncio.run(run())
 
 

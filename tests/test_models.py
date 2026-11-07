@@ -41,6 +41,12 @@ def test_booking_access_and_revoke():
     booking["revoked"] = True
     assert not booking_allows(booking, "gate1", now + timedelta(hours=1))
     assert "pin_hash" not in public_booking(booking)
+    named=make_booking(
+        "Camera 2", now.isoformat(),
+        (now + timedelta(days=1)).isoformat(), ["gate1"], "87654321",
+        "Ospite prova",
+    )
+    assert public_booking(named)["guest_name"]=="Ospite prova"
 
 
 def test_naive_datetime_rejected():
