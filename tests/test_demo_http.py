@@ -141,7 +141,7 @@ def test_valid_pin_simulates_only_allowlisted_virtual_script():
         assert "Camera 1" in response.text
         result = await demo_http.DemoPortalView().post(request, token)
         assert result.status == 200
-        assert "Comando virtuale inviato" in result.text
+        assert "Richiesta completata" in result.text
         assert "name='pin'" not in result.text
         assert len(hass.calls) == 1
         assert hass.calls[0][0:3] == (
@@ -198,7 +198,7 @@ def test_wrong_origin_rejected_before_pin_check():
             FakeRequest(hass, pin="12345678", origin="http://evil.example"), token
         )
         assert rejected.status == 403
-        assert "Origine non autorizzata" in rejected.text
+        assert "Richiesta non autorizzata" in rejected.text
         assert not hass.calls
     asyncio.run(run())
 
@@ -233,7 +233,7 @@ def test_originless_form_without_csrf_is_blocked():
         )
         result = await demo_http.DemoPortalView().post(request, token)
         assert result.status == 403
-        assert "Sessione del modulo non valida" in result.text
+        assert "Sessione non valida" in result.text
         assert not hass.calls
     asyncio.run(run())
 
@@ -244,7 +244,7 @@ def test_cross_site_origin_with_correct_csrf_is_still_blocked():
         request = FakeRequest(hass, pin="12345678", origin="https://other.example")
         result = await demo_http.DemoPortalView().post(request, token)
         assert result.status == 403
-        assert "Origine non autorizzata" in result.text
+        assert "Richiesta non autorizzata" in result.text
         assert not hass.calls
     asyncio.run(run())
 
@@ -286,7 +286,7 @@ def test_explicit_cross_site_fetch_metadata_blocks_even_with_valid_csrf():
             ), token
         )
         assert result.status == 403
-        assert "Origine non autorizzata" in result.text
+        assert "Richiesta non autorizzata" in result.text
         assert not hass.calls
     asyncio.run(run())
 
@@ -301,6 +301,6 @@ def test_csrf_is_required_even_for_android_opaque_origin():
             ), token
         )
         assert result.status == 403
-        assert "Sessione del modulo non valida" in result.text
+        assert "Sessione non valida" in result.text
         assert not hass.calls
     asyncio.run(run())
