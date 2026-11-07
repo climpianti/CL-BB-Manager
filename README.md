@@ -1,6 +1,6 @@
 # CL B&B Manager
 
-**Versione 0.4.0-alpha.4 — collaudo QR/PIN virtuale su rete LAN. Non per accessi reali in produzione.**
+**Versione 0.5.0-alpha.1 — collaudo QR/PIN virtuale su LAN e HTTPS opzionale. Non per accessi reali in produzione.**
 
 Integrazione custom per Home Assistant, progettata da CL Impianti per la gestione di varchi, camere e prenotazioni nei B&B.
 
@@ -12,6 +12,7 @@ Integrazione custom per Home Assistant, progettata da CL Impianti per la gestion
 - **QR permanenti /guest/** non attivi. Nel pannello Varchi si accede ora alla generazione di un **QR prova (LAN)** temporaneo; non consegnare QR agli ospiti reali.
 - **QR di prova temporaneo (10 minuti)**, generato dall'amministratore per uno dei cinque varchi **virtuali** della demo e utilizzabile da smartphone collegato alla **stessa rete LAN** di Home Assistant, senza account HA.
 - **Portale di prova** con PIN di prenotazione, controllo su permessi, data, revoca, limiti di tentativi persistenti, registro delle azioni e comando esclusivamente virtuale.
+- **QR HTTPS temporaneo (opzionale)**: richiede un'attivazione amministrativa esplicita e un dominio HTTPS fissato nelle opzioni; token valido 10 minuti, monouso dopo l'apertura, solo script virtuali. Vedere [piano di collaudo HTTPS](docs/PUBLIC-HTTPS-PILOT.md).
 
 ## Collaudo da smartphone sulla rete locale
 
@@ -38,11 +39,15 @@ Il Marketplace di Home Assistant 2026.11 può richiedere prima l'accettazione de
 
 **Alternativa manuale:** copia `custom_components/cl_bb_manager/` in `/config/custom_components/cl_bb_manager/`, valida la configurazione, riavvia e aggiungi l'integrazione dall'interfaccia.
 
-**Pubblicare questo repository su GitHub non attiva il portale pubblico**: il percorso `/guest/` resta disattivato e il QR `/demo/` è utilizzabile solo sulla LAN.
+**Pubblicare questo repository su GitHub non attiva il portale permanente**: il percorso `/guest/` resta disattivato e il QR `/demo/` è utilizzabile solo sulla LAN. La nuova pagina `/public-demo/` è inattiva fino all'attivazione esplicita delle opzioni HTTPS da parte dell'amministratore.
+
+## Collaudo HTTPS temporaneo (opzionale)
+
+In **Impostazioni → Dispositivi e servizi → CL B&B Manager → Configura**, l'amministratore può attivare il test HTTPS e inserire il nome di dominio esatto (solo HTTPS). Nel pannello **Collaudo accessi** è possibile generare un QR esterno, temporaneo e monouso, per un solo varco virtuale. L'accesso richiede un PIN di prenotazione valido; l'endpoint permanente `/guest/` resta spento. La disattivazione nelle opzioni invalida immediatamente le sessioni. Non usare questa modalità per serrature reali.
 
 ## Limiti importanti
 
-- **Il portale QR pubblico permanente è disattivato.** La nuova pagina QR temporanea è un ambiente di collaudo, non un sistema di accesso per clienti.
+- **Il portale QR pubblico permanente è disattivato.** I QR temporanei LAN/HTTPS sono ambienti di collaudo con soli script virtuali, non un sistema di accesso per clienti.
 - Non è consentito l'uso con serrature o attuatori fisici; non collegare gli script virtuali a comandi hardware.
 - La verifica dell'interfaccia su smartphone e il test completo sul server reale sono richiesti prima di considerare completata la fase alpha.
 - Per un prodotto commerciale restano da implementare protezione del proxy HTTPS, sessioni ospiti di produzione, ruoli gestore/installatore, GDPR, backup, audit e fail-safe.
