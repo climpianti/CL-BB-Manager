@@ -72,3 +72,34 @@ def test_gate_created_disabled_and_options_kept_unchanged():
     assert 'self.hass.states.get(gate["entity_id"]) is None' in source
     assert 'return self.async_create_entry(' in source
     assert 'data=self._unchanged_options()' in source
+
+
+
+def test_edit_gate_options_wiring_and_safety_guards():
+    source = (ROOT / "config_flow.py").read_text(encoding="utf-8")
+    assert '"edit_gate"' in source
+    assert "async def async_step_edit_gate" in source
+    assert "async def async_step_edit_gate_details" in source
+    assert 'check_gate_removal(gate_id, manager.data["bookings"])' in source
+    assert 'current["enabled"] = False' in source
+    assert 'current["token"] = candidate["token"]' in source
+    assert 'manager.demo_sessions.clear()' in source
+    assert 'manager.public_demo_sessions.clear()' in source
+    assert 'manager.audit("gate_updated", current["name"])' in source
+    assert 'self.hass.states.get(candidate["entity_id"]) is None' in source
+    assert 'current[key] = candidate[key]' in source
+
+
+def test_edit_options_preserves_operator_options():
+    source = (ROOT / "config_flow.py").read_text(encoding="utf-8")
+    assert 'data=self._unchanged_options()' in source
+    assert 'OPTION_OPERATOR_USERS, default=list(previous)' in source
+    for path in (
+        ROOT / "strings.json",
+        ROOT / "translations" / "it.json",
+    ):
+        import json
+        options = json.loads(path.read_text(encoding="utf-8"))["options"]["step"]
+        assert "edit_gate" in options["gates"]["menu_options"]
+        assert "edit_gate_details" in options
+        assert "operator_user_ids" in options["access"]["data"]
