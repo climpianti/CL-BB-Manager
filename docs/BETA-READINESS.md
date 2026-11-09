@@ -50,3 +50,20 @@ L'integrazione mantiene `hardware_control: disabled`. Gli endpoint permanenti os
 - [ ] Approvazione esplicita di un rilascio successivo con attivazione fisica gestita; **alpha.11 non abilita nessuna apertura fisica via QR**.
 
 Comando di verifica: `cl_bb_manager/hardware_preflight` via WebSocket autenticato amministratore, oppure pulsante **Verifica prerequisiti QR fisico** nel pannello Varchi. Nessun campo del report può abilitare serrature; `hardware_control` resta `disabled` e `physical_qr_enabled` sempre `false`.
+
+
+## QR security regression candidate alpha.12 — 9 novembre 2026
+
+Il pacchetto di regressione automatica `tests/test_qr_release_gate.py` esercita le view HTTP reali con un Home Assistant simulato, **senza alcun comando alle serrature reali**. Controlla: isolamento dello script candidato Shelly, PIN errato, prenotazioni revocate/scadute/non ancora iniziate, stanza/varco errati, proprietà differenti, origine HTTP/HTTPS non autorizzata, CSRF mancante/errato/scaduto, doppio invio concorrente del modulo, limiti persistenti per varco, varco disabilitato, script virtuale indisponibile e fallimento della chiamata servizio.
+
+### Criterio di pubblicazione
+
+- [ ] CI verde di alpha.12 e revisione del codice.
+- [ ] Installazione HACS e riavvio pilota con verifica di `hardware_control: disabled` e `physical_qr_enabled: false`.
+- [ ] Test reale HTTPS da connessione mobile: codice valido ed errato, revoca, tentativi ripetuti e gestione dei messaggi su iOS/Android. I test simulati in CI **non** sostituiscono il collaudo da rete esterna.
+- [ ] Backup aggiornato dopo l'ultimo intervento; verificare ripristino su istanza separata prima di aprire serrature reali da Internet.
+- [ ] Audit di sicurezza **indipendente** dell'integrazione, dell'accesso Internet, del reverse proxy e del percorso verso le serrature.
+- [ ] Convalida operativa degli stati di guasto Shelly offline, guasto di rete e mancata apertura confermata da sensore.
+- [ ] Pubblicazione release hardware disponibile solo dopo i precedenti requisiti: la release alpha.12 resta un rilascio **virtual-only**.
+
+**Roll-back software:** tornare al commit HACS `56123ec` (alpha.11) o al backup Home Assistant verificato. Non ruotare i token QR se non si sospetta compromissione; in quel caso revocarli con il comando amministrativo e sostituire fisicamente le stampe.
