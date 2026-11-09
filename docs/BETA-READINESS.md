@@ -105,3 +105,16 @@ arming/disarming procedure, explicit per-gate physical consent, a dedicated
 test reservation and real smartphone-to-Shelly supervised acceptance.
 Do not distribute dormant physical URLs to guests. The operator chose not to
 create an additional Home Assistant backup during this pilot.
+
+
+## Alpha.16 — persistent physical QR (controlled activation)
+
+The release includes a **non-expiring QR link** with independent, high-entropy physical token, guest PIN validation, per-booking physical authorization and revocation, server-side booking window and property scope, HTTPS host/origin checks, one-use CSRF forms, serialized access check, persisted per-gate/global rate limiting and a per-gate 12-second action cooldown. The QR *link* has no expiration; the guest PIN authorization always expires at checkout or revocation.
+
+The admin-only physical QR panel has explicit actions to prepare/rotate a physical QR (which stays unarmed), grant rights for an eligible booking, **arm a specific physical gate with no expiry**, disarm a gate without invalidating the printed code, or emergency-disable all physical access and revoke all physical tokens/grants. The existing permanent-demo URL continues to invoke virtual scripts only.
+
+**There is no automatic arming upon upgrade.** On initial install `physical_access_enabled` is unset/false and every `physical_enabled` flag is unset/false, so all physical requests fail closed until separately authorized.
+
+Mandatory field acceptance before arming: operator on site, physical gate and relay OFF, HTTPS mobile page with a new QR, correct booking PIN, one physical opening confirmed by operator, relay OFF following impulse, wrong/revoked PIN and replay rejected, disarm/emergency disable tested. Do not expose the new QR to guests before these tests.
+
+An internal security review and unit tests are not an independent penetration test of the public edge. The operator takes responsibility for approving and monitoring permanent Internet-accessible physical actuation; document review findings separately. No new backup requested.
