@@ -67,3 +67,17 @@ Il pacchetto di regressione automatica `tests/test_qr_release_gate.py` esercita 
 - [ ] Pubblicazione release hardware disponibile solo dopo i precedenti requisiti: la release alpha.12 resta un rilascio **virtual-only**.
 
 **Roll-back software:** tornare al commit HACS `56123ec` (alpha.11) o al backup Home Assistant verificato. Non ruotare i token QR se non si sospetta compromissione; in quel caso revocarli con il comando amministrativo e sostituire fisicamente le stampe.
+
+
+## Physical QR protected path — alpha.13 (staging only)
+
+A separate HTTP route `/api/cl_bb_manager/physical/{token}` now exists behind a **code-level kill switch** `PHYSICAL_RELEASE_ENABLED = False`. It returns 404 for all requests in this release, regardless of PIN, QR, HA state or caller privileges. The existing `permanent-demo` QR remains unchanged, and continues to target only virtual scripts. **No physical QR is issued.**
+
+A future reviewed release must separately provision a strong `physical_token`, explicitly opt in per gate and per installation, grant `physical_gate_ids` for each booking, inspect live Shelly health and source/CSRF checks, and enforce persisted attempt limits, cooldown, property isolation and audit. The new design makes none of these permissions inherited from demo bookings.
+
+Mocked end-to-end tests verify default unavailability, distinct tokens, missing physical grants, unavailable hardware, repeated submissions, invalid PIN, cross-site submissions and cooldown. All simulated service calls are captured by the fake Home Assistant object; CI never connects to a real actuator.
+
+- [ ] Complete independent code/security review, load testing and real mobile/browser HTTPS acceptance prior to any change of kill-switch state.
+- [ ] Define administrative approval and instant disable/rollback operation; do not expose an unreviewed enable endpoint.
+- [ ] Verify how an accepted Home Assistant service call is confirmed by a physical door sensor, or present its uncertainty explicitly.
+- [ ] Only after the above: release a separate, reviewed production build that intentionally enables the physical route and provisions new tokens; no existing printed demo QR should become a physical key automatically.
