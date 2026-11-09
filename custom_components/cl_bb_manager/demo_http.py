@@ -20,7 +20,7 @@ from .property_scope import belongs_to_property
 from .security import candidate_bookings, charge_attempt, demo_target_allowed
 
 
-def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf: str = "", complete: bool = False) -> web.Response:
+def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf: str = "", complete: bool = False, physical: bool = False) -> web.Response:
     """CL Control BlueTech Glass access screen; all dynamic text is HTML-escaped."""
     name = escape(gate_name, quote=True)
     info = escape(message, quote=True)
@@ -29,7 +29,7 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
             "<div class='result' role='status' aria-live='polite'>"
             "<span class='result-icon' aria-hidden='true'>✓</span>"
             "<strong>Richiesta completata</strong>"
-            "<p>Operazione virtuale eseguita correttamente.</p></div>"
+            ("<p>Comando di apertura inviato; verifica la porta.</p></div>" if physical\n             else "<p>Operazione virtuale eseguita correttamente.</p></div>")
         )
     else:
         form_html = (
@@ -105,7 +105,7 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         f"{form_html}"
         "<div class='security'><span class='dot' aria-hidden='true'></span>"
         "Codice protetto · Sessione temporanea</div>"
-        "</main><p class='disclaimer'>Ambiente pilota: nessuna porta fisica viene comandata.</p>"
+        ("</main><p class='disclaimer'>L'invio del comando non conferma lo sblocco della serratura.</p>"\n         if physical else "</main><p class='disclaimer'>Ambiente pilota: nessuna porta fisica viene comandata.</p>")
         "</div></body></html>"
     )
     return web.Response(
