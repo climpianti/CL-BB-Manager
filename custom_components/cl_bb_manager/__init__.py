@@ -125,6 +125,8 @@ class BBManager:
                     key: gate[key] for key in ("entity_id", "action")
                 })
                 item["hardware_candidate"] = read_candidate(gate)
+                item["physical_qr_prepared"] = bool(gate.get("physical_token"))
+                item["physical_enabled"] = gate.get("physical_enabled") is True
             gates.append(item)
         return {
             "structure": self.entry.data.get("structure_name", "B&B"),
@@ -136,7 +138,7 @@ class BBManager:
             "guest_portal": "disabled",
             "public_pilot": "enabled" if self.entry.options.get("public_pilot_enabled", False) else "disabled",
             "permanent_pilot": "enabled" if self.entry.options.get("permanent_pilot_enabled", False) else "disabled",
-            "hardware_control": "disabled",
+            "hardware_control": "enabled" if (self.data.get("physical_access_enabled") is True and any(g.get("physical_enabled") is True for g in self.data["gates"])) else "disabled",
         }
 
 
