@@ -4,7 +4,7 @@ from __future__ import annotations
 import ast
 import importlib.util
 from pathlib import Path
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1] / "custom_components/cl_bb_manager"
@@ -35,6 +35,16 @@ def test_revocation_is_immediate_in_role_policy():
     assert module.user_role(user("operator"), options) == "operator"
     options["operator_user_ids"] = []
     assert module.user_role(user("operator"), options) is None
+
+
+def test_home_assistant_immutable_options_authorize_only_selected_active_users():
+    backing = {"operator_user_ids": ["selected-user"]}
+    options = MappingProxyType(backing)
+    assert module.user_role(user("selected-user"), options) == "operator"
+    assert module.user_role(user("other-user"), options) is None
+    assert module.user_role(user("selected-user", active=False), options) is None
+    backing["operator_user_ids"] = []
+    assert module.user_role(user("selected-user"), options) is None
 
 
 def test_malformed_allowlists_fail_closed():
@@ -81,7 +91,7 @@ def test_admin_only_handlers_remain_guarded_on_server():
 
 def test_role_loveless_panel_is_not_admin_only():
     source = (ROOT / "__init__.py").read_text(encoding="utf-8")
-    assert 'sidebar_title=None' in source
+    assert 'sidebar_title="CL B&B Manager"' in source
     assert 'require_admin=False' in source
     assert 'role=user_role(connection.user, manager.entry.options)' in (ROOT / "api.py").read_text(encoding="utf-8")
 
@@ -93,3 +103,4 @@ def test_panel_does_not_hijack_ha_configure_button():
     assert "require_admin=False" in panel
     assert "async_get_options_flow" in options
     assert "operator_user_ids" in options or "OPTION_OPERATOR_USERS" in options
+

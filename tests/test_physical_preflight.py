@@ -37,7 +37,7 @@ def test_strict_public_post_origin(origin, fetch_site, expected):
     ) is expected
 
 
-def test_preflight_never_unblocks_physical_qr_even_with_online_script():
+def test_preflight_reports_readiness_without_arming_or_mutating():
     property_id = scope.new_property("Pilot")["id"]
     gate = {
         "id": "gate1", "name": "Scala", "property_id": property_id,
@@ -56,10 +56,10 @@ def test_preflight_never_unblocks_physical_qr_even_with_online_script():
     report = preflight.hardware_preflight(
         gate, property_id, hass, frozenset({"script.cl_bb_demo_apri_portone"})
     )
-    assert report["status"] == "blocked"
-    assert report["ready_for_physical_qr"] is False
+    assert report["status"] == "ready"
+    assert report["ready_for_physical_qr"] is True
     assert report["script_id"] == "script.cl_bb_porta_scala_impulso_locale"
-    assert report["blockers"]
+    assert report["blockers"] == []
     # No mutating side effects; existing QR mapping remains virtual.
     assert gate["entity_id"] == "script.cl_bb_demo_apri_portone"
 
@@ -77,3 +77,4 @@ def test_live_post_paths_use_only_strict_policy_and_demo_scripts():
     )[0]
     assert 'admin_only=True' in block
     assert "services.async_call" not in block
+

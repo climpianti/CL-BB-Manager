@@ -1,11 +1,12 @@
 """Central, fail-closed user policy for the CL B&B Manager operator role.
 
 Only Home Assistant administrators can configure mappings and integration options.
-Explicitly selected active users can manage reservations, PINs and temporary QR.
+Explicitly selected active users can manage reservations, PINs and door QR.
 """
 from __future__ import annotations
 
 from typing import Any
+from collections.abc import Mapping
 
 OPTION_OPERATOR_USERS = "operator_user_ids"
 MAX_OPERATORS = 20
@@ -13,7 +14,7 @@ MAX_OPERATORS = 20
 
 def operator_user_ids(options: Any) -> tuple[str, ...]:
     """Read valid IDs from an integration options mapping; ignore malformed data."""
-    if not isinstance(options, dict):
+    if not isinstance(options, Mapping):
         return ()
     raw = options.get(OPTION_OPERATOR_USERS, [])
     if not isinstance(raw, (list, tuple)):
@@ -34,3 +35,4 @@ def user_role(user: Any, options: Any) -> str | None:
     if user_id and user_id in operator_user_ids(options):
         return "operator"
     return None
+

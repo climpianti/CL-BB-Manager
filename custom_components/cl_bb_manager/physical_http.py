@@ -1,9 +1,4 @@
-"""Isolated physical QR endpoint; hard-disabled in this release.
-
-Unlike the virtual permanent pilot, this path requires an independent token,
-an explicit physical grant on the booking, a per-gate hardware enable flag,
-and global hardware enablement. No public QR is issued for this route.
-"""
+"""Permanent guest access with per-booking permissions and replay protection."""
 from __future__ import annotations
 
 import secrets
@@ -32,11 +27,14 @@ def _context(request, token: str):
         raise web.HTTPNotFound()
     try:
         origin = validate_public_origin(
-            hass.config.external_url or manager.entry.options.get("public_pilot_origin", "")
+            hass.config.external_url or manager.entry.options.get("public_origin")
+            or manager.entry.options.get("public_pilot_origin", "")
         )
     except ValueError as exc:
         raise web.HTTPNotFound() from exc
     if request.host.lower() != origin.removeprefix("https://"):
+        raise web.HTTPNotFound()
+    if manager.entry.options.get("public_access_enabled", True) is not True:
         raise web.HTTPNotFound()
     if not isinstance(token, str) or not 40 <= len(token) <= 100:
         raise web.HTTPNotFound()
@@ -52,7 +50,7 @@ def _context(request, token: str):
 
 
 class PhysicalGuestView(HomeAssistantView):
-    """Future physical QR route, unreachable while release kill switch is off."""
+    """Guest endpoint; no HA user credentials are accepted as a booking PIN."""
 
     url = "/api/cl_bb_manager/physical/{token}"
     name = "api:cl_bb_manager:physical"
@@ -145,9 +143,27 @@ class PhysicalGuestView(HomeAssistantView):
             except Exception as exc:
                 raise web.HTTPServiceUnavailable() from exc
             try:
-                await hass.services.async_call(
-                    "script", "turn_on", {"entity_id": script_id}, blocking=True,
-                )
+                def still_authorized():
+                    # Native profile reads can take seconds: expiry or a config
+                    # reload during those awaits must cancel the opening.
+                    return (
+                        hass.data.get(DOMAIN, {}).get("manager") is manager
+                        and manager.entry.options.get("public_access_enabled", True) is True
+                        and approved_booking(matched, gate["id"], manager.property_id)
+                        and physical_target(manager, gate, hass, token=token) is not None
+                    )
+                if "entity_binding" in gate:
+                    from .entity_gate import async_command
+                    await async_command(manager, gate, before_command=still_authorized)
+                elif "shelly_binding" in gate:
+                    from .shelly_gate import async_pulse
+                    await async_pulse(hass, gate["shelly_binding"], before_command=still_authorized)
+                else:
+                    if not still_authorized():
+                        raise ValueError("Autorizzazione scaduta durante la verifica.")
+                    await hass.services.async_call(
+                        "script", "turn_on", {"entity_id": script_id}, blocking=True,
+                    )
             except Exception as exc:
                 manager.audit("physical_service_failed", gate["id"])
                 await manager.async_save()

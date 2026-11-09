@@ -1,6 +1,6 @@
 """Role-aware websocket API for CL B&B Manager.
 
-The API intentionally contains NO service calls for opening gates in this alpha.
+Device setup is admin-only. Opening requires the separate physical PIN endpoint.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import voluptuous as vol
 
 from .const import DOMAIN, MAX_BOOKINGS, MAX_GATES
 from .models import as_utc, generate_pin, make_booking, make_gate, pin_matches
-from .gate_management import check_gate_removal
+from .gate_management import check_gate_removal, native_mapping_changed
 from .physical_admin import invalidate_gate_physical_credentials
 from .permissions import user_role
 from .property_scope import assert_gate_scope, require_record_scope
@@ -67,7 +67,7 @@ def register_commands(hass):
         "type": "cl_bb_manager/add_gate",
         vol.Required("name"): str,
         vol.Required("entity_id"): str,
-        vol.Required("action"): vol.In(["script.turn_on", "button.press", "lock.unlock"]),
+        vol.Required("action"): vol.In(["script.turn_on", "button.press", "lock.unlock", "lock.open", "switch.turn_on", "cover.open_cover", "input_button.press"]),
         vol.Required("kind"): vol.In(["shared", "private"]),
     })
     @websocket_api.async_response
@@ -97,7 +97,7 @@ def register_commands(hass):
         vol.Required("gate_id"): str,
         vol.Required("name"): str,
         vol.Required("entity_id"): str,
-        vol.Required("action"): vol.In(["script.turn_on", "button.press", "lock.unlock"]),
+        vol.Required("action"): vol.In(["script.turn_on", "button.press", "lock.unlock", "lock.open", "switch.turn_on", "cover.open_cover", "input_button.press"]),
         vol.Required("kind"): vol.In(["shared", "private"]),
         vol.Required("enabled"): bool,
     })
@@ -124,6 +124,8 @@ def register_commands(hass):
                     original[key] != candidate[key]
                     for key in ("entity_id", "action", "kind")
                 )
+                if "shelly_binding" in original or "entity_binding" in original:
+                    sensitive_change = native_mapping_changed(hass, original, candidate)
                 if sensitive_change:
                     # Keep active/future bookings bound to the same gate mapping.
                     check_gate_removal(original["id"], manager.data["bookings"])
@@ -209,6 +211,13 @@ def register_commands(hass):
                 if len(manager.data["bookings"]) >= MAX_BOOKINGS:
                     raise ValueError("Numero massimo di prenotazioni raggiunto.")
                 booking["property_id"] = property_id
+                # Explicit selection when creating a booking defines its physical ACL.
+                # Existing reservations keep their grants unchanged during upgrade.
+                booking["physical_gate_ids"] = [
+                    gate["id"] for gate in manager.data["gates"]
+                    if gate["id"] in selected and gate.get("physical_token")
+                    and (gate.get("shelly_binding") or gate.get("entity_binding") or gate.get("hardware_candidate"))
+                ]
                 manager.data["bookings"].append(booking)
                 manager.audit("booking_added", booking["room"])
                 await manager.async_save()
@@ -675,8 +684,12 @@ def register_commands(hass):
 
     from .physical_admin import register_physical_admin_commands
     register_physical_admin_commands(hass, _authorize, _summary, _error)
+    from .gate_api import register_gate_setup_commands
+    register_gate_setup_commands(hass, _authorize, _summary, _manager, _error)
 
     for handler in (
-        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin, demo_qr, public_pilot_qr, permanent_pilot_qr, rotate_permanent_qr, stage_hardware_gate, clear_hardware_gate, hardware_preflight_report
+        get_list, update_gate, remove_gate, add_booking, revoke_booking,
+        hardware_preflight_report
     ):
         websocket_api.async_register_command(hass, handler)
+

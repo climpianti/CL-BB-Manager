@@ -1,3 +1,5 @@
+> Documento storico delle release precedenti. Per installazione e stato attuali vedere [README](../README.md) e [PRODUCT-READINESS](PRODUCT-READINESS.md).
+
 # Collaudo QR HTTPS temporaneo (0.5.0-alpha.1)
 
 **SOLO COLLAUDO CON SCRIPT VIRTUALI. NON PER PORTE FISICHE.**
@@ -39,3 +41,4 @@ Il portale permanente `/api/cl_bb_manager/guest/{token}` rimane disattivato. Il 
 Disattivare **Collaudo QR temporaneo via HTTPS** nelle opzioni dell'integrazione; tutte le richieste alla pagina pubblica devono tornare 404 senza bisogno di cancellare prenotazioni. Se necessario ripristinare la versione precedente e riavviare da finestra concordata. Non collegare mai questa versione agli attuatori delle porte reali.
 
 **Questa versione è una alpha di prova.** I controlli qui descritti non sostituiscono un penetration test o una verifica indipendente del reverse proxy e dei requisiti privacy.
+

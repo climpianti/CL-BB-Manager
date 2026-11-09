@@ -6,6 +6,7 @@ administrator confirmation and can be disabled at any time.
 from __future__ import annotations
 
 from io import BytesIO
+from copy import deepcopy
 import secrets
 
 from homeassistant.components import websocket_api
@@ -13,7 +14,7 @@ import voluptuous as vol
 
 from .const import DOMAIN
 from .hardware_staging import read_candidate
-from .physical_policy import PILOT_SCRIPT_RELAY, PHYSICAL_RELEASE_ENABLED
+from .physical_policy import PILOT_SCRIPT_RELAY, PHYSICAL_RELEASE_ENABLED, ready_actuator
 from .property_scope import require_record_scope
 from .public_policy import validate_public_origin
 
@@ -48,7 +49,7 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
         try:
             import segno
             origin = validate_public_origin(
-                hass.config.external_url
+                hass.config.external_url or manager.entry.options.get("public_origin")
                 or manager.entry.options.get("public_pilot_origin", "")
             )
             async with manager.lock:
@@ -57,17 +58,10 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
                     raise ValueError("Varco non disponibile.")
                 gate = matches[0]
                 require_record_scope(gate, manager.property_id)
-                if gate.get("enabled") is not True:
+                if gate.get("enabled") is not True and not any(key in gate for key in ("shelly_binding", "entity_binding")):
                     raise ValueError("Varco disabilitato.")
-                candidate = read_candidate(gate)
-                if candidate is None or candidate["entity_id"] not in PILOT_SCRIPT_RELAY:
-                    raise ValueError("Script Shelly non incluso nell'allowlist del pilota.")
-                if gate.get("entity_id") == candidate["entity_id"]:
-                    raise ValueError("I percorsi demo e fisici devono restare separati.")
-                script = hass.states.get(candidate["entity_id"])
-                relay = hass.states.get(PILOT_SCRIPT_RELAY[candidate["entity_id"]])
-                if script is None or script.state != "off" or relay is None or relay.state != "off":
-                    raise ValueError("Script o Shelly non pronto.")
+                if ready_actuator(gate, hass) is None:
+                    raise ValueError("Dispositivo del varco non pronto.")
                 token = secrets.token_urlsafe(36)
                 while token == gate.get("token") or token == gate.get("physical_token"):
                     token = secrets.token_urlsafe(36)
@@ -87,7 +81,7 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
                 "url": url,
                 "armed": False,
                 "release_enabled": PHYSICAL_RELEASE_ENABLED,
-                "message": "QR fisico preparato ma non abilitato: non stampare per gli ospiti.",
+                "message": "Nuovo QR preparato. Il varco resta disattivato fino all'abilitazione.",
             })
         except (ValueError, TypeError) as err:
             send_error(connection, msg, err)
@@ -168,6 +162,7 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
         "type": "cl_bb_manager/arm_physical_gate",
         vol.Required("gate_id"): str,
         vol.Required("confirm"): vol.Equal(True),
+        vol.Optional("confirm_wiring", default=False): bool,
     })
     @websocket_api.async_response
     async def arm_physical_gate(hass, connection, msg):
@@ -187,37 +182,85 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
                     raise ValueError("La release non consente l'accesso fisico.")
                 if not isinstance(gate.get("physical_token"), str):
                     raise ValueError("Preparare il nuovo QR fisico prima dell'attivazione.")
-                # Recheck the exact approved script, script state and Shelly relay.
-                from .physical_policy import PILOT_SCRIPT_RELAY
-                candidate = read_candidate(gate)
-                if (
-                    gate.get("enabled") is not True
-                    or candidate is None
-                    or candidate["entity_id"] not in PILOT_SCRIPT_RELAY
-                ):
-                    raise ValueError("Varco o script non approvato.")
-                script = hass.states.get(candidate["entity_id"])
-                relay = hass.states.get(PILOT_SCRIPT_RELAY[candidate["entity_id"]])
-                if (
-                    script is None or script.state != "off"
-                    or relay is None or relay.state != "off"
-                ):
-                    raise ValueError("Script o relè non pronto.")
-                # Require at least one deliberately authorized, eligible booking.
-                from .physical_policy import approved_booking
-                if not any(
-                    approved_booking(booking, gate["id"], manager.property_id)
-                    for booking in manager.data["bookings"]
-                ):
-                    raise ValueError("Manca una prenotazione attiva con permesso fisico esplicito.")
+                if ready_actuator(gate, hass) is None:
+                    raise ValueError("Dispositivo del varco non pronto.")
+                previous_gate = deepcopy(gate)
+                had_global = "physical_access_enabled" in manager.data
+                previous_global = manager.data.get("physical_access_enabled", False)
+                previous_events = deepcopy(manager.data["events"])
+                if any(key in gate for key in ("shelly_binding", "entity_binding")):
+                    if msg.get("confirm_wiring") is not True:
+                        raise ValueError("Conferma la verifica del collegamento e della durata dell'impulso.")
+                    if "shelly_binding" in gate:
+                        from .shelly_gate import async_validate
+                        await async_validate(hass, gate["shelly_binding"])
+                    else:
+                        from .entity_gate import resolve_binding
+                        resolve_binding(hass, gate["entity_binding"])
+                        if gate['id'] in manager.data.get('pending_entity_pulses', {}):
+                            raise ValueError('Ripristina il precedente impulso prima di abilitare il varco.')
+                    # No test booking is needed to commission a new installation.
+                    # Every opening still needs its own currently eligible booking.
+                    gate["enabled"] = True
+                else:
+                    from .physical_policy import approved_booking
+                    if gate.get("enabled") is not True or not any(
+                        approved_booking(b, gate["id"], manager.property_id)
+                        for b in manager.data["bookings"]
+                    ):
+                        raise ValueError("Manca una prenotazione attiva con permesso fisico esplicito.")
                 manager.data["physical_access_enabled"] = True
                 gate["physical_enabled"] = True
                 manager.audit("physical_gate_armed_permanent", gate["id"])
-                await manager.async_save()
+                try:
+                    await manager.async_save()
+                except Exception as exc:
+                    gate.clear()
+                    gate.update(previous_gate)
+                    if had_global:
+                        manager.data["physical_access_enabled"] = previous_global
+                    else:
+                        manager.data.pop("physical_access_enabled", None)
+                    manager.data["events"] = previous_events
+                    manager.physical_forms.clear()
+                    raise ValueError("Salvataggio non riuscito: abilitazione non completata.") from exc
             connection.send_result(msg["id"], {
                 "armed": True, "gate_id": msg["gate_id"],
                 "persistent": True,
                 "message": "QR fisico attivo senza scadenza; PIN e prenotazione rimangono obbligatori.",
+            })
+        except (ValueError, TypeError, KeyError) as err:
+            send_error(connection, msg, err)
+
+    @websocket_api.websocket_command({
+        "type": "cl_bb_manager/physical_qr",
+        vol.Required("gate_id"): str,
+    })
+    @websocket_api.async_response
+    async def physical_qr(hass, connection, msg):
+        """Read the existing printable QR; never rotate credentials or arm."""
+        manager = authorize(hass, connection, msg)
+        if manager is None:
+            return
+        try:
+            import segno
+            origin = validate_public_origin(hass.config.external_url
+                or manager.entry.options.get("public_origin")
+                or manager.entry.options.get("public_pilot_origin", ""))
+            gates = [g for g in manager.data["gates"] if g.get("id") == msg["gate_id"]]
+            if len(gates) != 1:
+                raise ValueError("Varco non disponibile.")
+            gate = require_record_scope(gates[0], manager.property_id)
+            token = gate.get("physical_token")
+            if not isinstance(token, str) or not 40 <= len(token) <= 100:
+                raise ValueError("QR non ancora predisposto per questo varco.")
+            target = origin + "/api/cl_bb_manager/physical/" + token
+            buffer = BytesIO()
+            segno.make_qr(target).save(buffer, kind="svg", scale=8, border=4)
+            connection.send_result(msg["id"], {
+                "gate_id": gate["id"], "name": gate["name"],
+                "url": target, "svg": buffer.getvalue().decode(),
+                "armed": gate.get("physical_enabled") is True,
             })
         except (ValueError, TypeError, KeyError) as err:
             send_error(connection, msg, err)
@@ -278,5 +321,7 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
         arm_physical_gate,
         disarm_physical_gate,
         emergency_disable_physical,
+        physical_qr,
     ):
         websocket_api.async_register_command(hass, handler)
+

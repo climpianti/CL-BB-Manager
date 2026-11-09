@@ -1,3 +1,5 @@
+> Documento storico delle release precedenti. Per installazione e stato attuali vedere [README](../README.md) e [PRODUCT-READINESS](PRODUCT-READINESS.md).
+
 # Sicurezza — CL B&B Manager 0.4.0-alpha.1
 
 **Prototipo per collaudo virtuale. Non installare su accessi fisici attivi.**
@@ -23,3 +25,4 @@
 - Le sessioni locali temporanee non sono equivalenti a un portale ospiti di produzione.
 
 Non pubblicare QR o token di prova in chat, ticket pubblici o repository; anche una sessione di 10 minuti è un segreto temporaneo.
+

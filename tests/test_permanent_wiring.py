@@ -29,10 +29,12 @@ def test_permanent_route_opt_in_and_virtual_only():
     assert 'property_id=manager.property_id' in server
     assert 'manager.permanent_forms = {}' not in store
     assert 'self.permanent_forms = {}' in store
-    assert 'hass.http.register_view(PermanentPilotView())' in store
-    assert '"permanent_pilot_enabled"' in opts
-    assert 'default=self.config_entry.options.get("permanent_pilot_enabled", False)' in opts
-    assert 'permanent_pilot_qr' in panel
-    assert 'rotate_permanent_qr' in panel
+    assert 'hass.http.register_view(PermanentPilotView())' not in store
+    assert 'hass.http.register_view(PhysicalGuestView())' in store
+    assert '"public_access_enabled"' in opts
+    assert 'permanent_pilot_qr' not in panel
+    assert 'rotate_permanent_qr' not in panel
+    assert 'this.api("physical_qr"' in panel
     assert 'preview.innerHTML' not in panel  # the QR is rendered as an image, not injected HTML
-    assert 'download.download="CL-BB-QR-"' in panel
+    assert 'dl.download="CL-BB-QR-"' in panel
+

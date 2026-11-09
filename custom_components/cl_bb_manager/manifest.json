@@ -1,7 +1,7 @@
 {
   "domain": "cl_bb_manager",
   "name": "CL B&B Manager",
-  "version": "0.5.0-alpha.17",
+  "version": "0.6.0-beta.2",
   "documentation": "https://github.com/climpianti/CL-BB-Manager",
   "issue_tracker": "https://github.com/climpianti/CL-BB-Manager/issues",
   "codeowners": [],
@@ -12,6 +12,7 @@
     "frontend"
   ],
   "config_flow": true,
+  "after_dependencies": ["shelly"],
   "requirements": [
     "segno==1.6.6"
   ],

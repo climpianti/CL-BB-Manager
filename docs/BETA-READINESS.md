@@ -1,3 +1,5 @@
+> Documento storico delle release precedenti. Per installazione e stato attuali vedere [README](../README.md) e [PRODUCT-READINESS](PRODUCT-READINESS.md).
+
 # CL B&B Manager — checklist pre-beta (9 novembre 2026)
 
 Questa checklist distingue test eseguiti da attività ancora aperte. La release **0.5.0-alpha.7** non è un prodotto per il controllo di serrature fisiche.
@@ -118,3 +120,4 @@ The admin-only physical QR panel has explicit actions to prepare/rotate a physic
 Mandatory field acceptance before arming: operator on site, physical gate and relay OFF, HTTPS mobile page with a new QR, correct booking PIN, one physical opening confirmed by operator, relay OFF following impulse, wrong/revoked PIN and replay rejected, disarm/emergency disable tested. Do not expose the new QR to guests before these tests.
 
 An internal security review and unit tests are not an independent penetration test of the public edge. The operator takes responsibility for approving and monitoring permanent Internet-accessible physical actuation; document review findings separately. No new backup requested.
+

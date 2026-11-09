@@ -6,7 +6,7 @@ from homeassistant import config_entries
 from homeassistant.helpers import selector
 
 from .const import DOMAIN, MAX_GATES
-from .gate_management import check_gate_removal
+from .gate_management import check_gate_removal, native_mapping_changed
 from .property_scope import require_record_scope
 from .models import make_gate
 from .permissions import MAX_OPERATORS, OPTION_OPERATOR_USERS, operator_user_ids
@@ -53,7 +53,7 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
         )
 
     async def async_step_access(self, user_input=None):
-        """Persist the selected active operators with reliable UI defaults."""
+        """Persist operator selection without changing existing gates or grants."""
         users = await self.hass.auth.async_get_users()
         eligible = {
             str(user.id): str(getattr(user, "name", "") or user.id)
@@ -62,77 +62,39 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
             and not bool(getattr(user, "is_admin", False))
             and not bool(getattr(user, "system_generated", False))
         }
-        previous = [
-            user_id for user_id in operator_user_ids(self.config_entry.options)
-            if user_id in eligible
-        ]
+        previous = [uid for uid in operator_user_ids(self.config_entry.options) if uid in eligible]
         errors = {}
         if user_input is not None:
             selected = user_input.get(OPTION_OPERATOR_USERS, [])
-            if (
-                not isinstance(selected, list)
-                or len(selected) > MAX_OPERATORS
+            if (not isinstance(selected, list) or len(selected) > MAX_OPERATORS
                 or len(selected) != len(set(selected))
-                or any(not isinstance(user_id, str) or user_id not in eligible
-                       for user_id in selected)
-            ):
+                or any(not isinstance(uid, str) or uid not in eligible for uid in selected)):
                 errors["base"] = "invalid_operator_users"
-            enabled = bool(user_input.get("public_pilot_enabled", False))
-            permanent_enabled = bool(user_input.get("permanent_pilot_enabled", False))
-            origin = str(user_input.get("public_pilot_origin", "")).strip()
-            origin = self.hass.config.external_url or origin
-            if enabled or permanent_enabled:
+            enabled = user_input.get("public_access_enabled", True) is True
+            origin = self.hass.config.external_url or str(user_input.get("public_origin", "")).strip()
+            if enabled:
                 try:
                     origin = validate_public_origin(origin)
                 except ValueError:
                     errors["base"] = "invalid_public_origin"
             if not errors:
                 updated = self._unchanged_options()
-                updated.update({
-                    "public_pilot_enabled": enabled,
-                    "permanent_pilot_enabled": permanent_enabled,
-                    "public_pilot_origin": origin if (enabled or permanent_enabled) else "",
-                    OPTION_OPERATOR_USERS: selected,
-                })
+                updated.update(public_access_enabled=enabled, public_origin=origin,
+                               **{OPTION_OPERATOR_USERS: selected})
                 return self.async_create_entry(title="", data=updated)
-
-        schema = vol.Schema({
-            vol.Required(
-                "permanent_pilot_enabled",
-                default=self.config_entry.options.get("permanent_pilot_enabled", False),
-            ): bool,
-            vol.Required(
-                "public_pilot_enabled",
-                default=self.config_entry.options.get("public_pilot_enabled", False),
-            ): bool,
-            vol.Optional(
-                "public_pilot_origin",
-                default=self.hass.config.external_url
-                or self.config_entry.options.get("public_pilot_origin", ""),
-            ): str,
-            # Keep a concrete default. Reopening the form must show who is
-            # persisted, and saving another field must not silently lose them.
-            vol.Required(
-                OPTION_OPERATOR_USERS, default=list(previous)
-            ): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=[
-                        selector.SelectOptionDict(value=user_id, label=name)
-                        for user_id, name in sorted(
-                            eligible.items(), key=lambda item: item[1].casefold()
-                        )
-                    ],
-                    multiple=True,
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                )
-            ),
-        })
-        names = ", ".join(eligible[user_id] for user_id in previous) or "Nessuno"
+        origin = self.hass.config.external_url or self.config_entry.options.get("public_origin") or self.config_entry.options.get("public_pilot_origin", "")
         return self.async_show_form(
-            step_id="access",
-            data_schema=schema,
-            errors=errors,
-            description_placeholders={"current_operators": names},
+            step_id="access", errors=errors,
+            description_placeholders={"current_operators": ", ".join(eligible[uid] for uid in previous) or "Nessuno"},
+            data_schema=vol.Schema({
+                vol.Required("public_access_enabled", default=self.config_entry.options.get("public_access_enabled", True)): bool,
+                vol.Optional("public_origin", default=origin): str,
+                vol.Required(OPTION_OPERATOR_USERS, default=list(previous)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=[
+                        selector.SelectOptionDict(value=uid, label=name)
+                        for uid, name in sorted(eligible.items(), key=lambda item: item[1].casefold())
+                    ], multiple=True, mode=selector.SelectSelectorMode.DROPDOWN)),
+            }),
         )
 
     async def async_step_gates(self, user_input=None):
@@ -144,55 +106,75 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
         )
 
     async def async_step_add_gate(self, user_input=None):
-        """Create a disabled mapping; never activate an actuator from the flow."""
+        return self.async_show_menu(step_id="add_gate", menu_options=["add_entity_gate", "add_shelly_gate"])
+
+    async def async_step_add_entity_gate(self, user_input=None):
+        from .gate_setup import async_add_entity_gate
+        from .entity_gate import ACTIONS
         manager = self._manager()
         if manager is None:
             return self.async_abort(reason="not_ready")
         errors = {}
         if user_input is not None:
             try:
-                gate = make_gate(
-                    user_input["name"], user_input["entity_id"],
-                    user_input["action"], user_input["kind"], enabled=False,
-                )
-                if self.hass.states.get(gate["entity_id"]) is None:
-                    raise ValueError("Entità Home Assistant non trovata.")
-                async with manager.lock:
-                    if len(manager.data["gates"]) >= MAX_GATES:
-                        raise ValueError("Numero massimo di varchi raggiunto.")
-                    if any(
-                        item["entity_id"] == gate["entity_id"]
-                        for item in manager.data["gates"]
-                    ):
-                        raise ValueError("Entità già associata a un varco.")
-                    gate["property_id"] = manager.property_id
-                    manager.data["gates"].append(gate)
-                    manager.audit("gate_added", gate["name"])
-                    await manager.async_save()
+                if user_input.get("confirm") is not True:
+                    raise ValueError("Conferma l'associazione del varco.")
+                await async_add_entity_gate(manager, name=user_input["name"], entity_id=user_input["entity_id"],
+                    action=user_input["action"], kind=user_input["kind"], seconds=user_input.get("pulse_seconds", 2),
+                    switch_mode=user_input.get("switch_mode", "ha_pulse"),
+                    confirm_device_pulse=user_input.get("confirm_device_pulse", False))
             except (KeyError, TypeError, ValueError):
                 errors["base"] = "invalid_gate"
             else:
-                return self.async_create_entry(
-                    title="", data=self._unchanged_options()
-                )
+                return self.async_create_entry(title="", data=self._unchanged_options())
+        return self.async_show_form(step_id="add_entity_gate", errors=errors, data_schema=vol.Schema({
+            vol.Required("name"): str,
+            vol.Required("entity_id"): selector.EntitySelector(selector.EntitySelectorConfig(domain=list(dict.fromkeys(domain for domain, label in ACTIONS.values())))),
+            vol.Required("action", default="lock.unlock"): selector.SelectSelector(selector.SelectSelectorConfig(
+                options=[selector.SelectOptionDict(value=action, label=label) for action, (domain, label) in ACTIONS.items()],
+                mode=selector.SelectSelectorMode.DROPDOWN)),
+            vol.Required("kind", default="private"): vol.In(["private", "shared"]),
+            vol.Required("switch_mode", default="ha_pulse"): selector.SelectSelector(selector.SelectSelectorConfig(
+                options=[selector.SelectOptionDict(value="ha_pulse", label="Impulso gestito da Home Assistant"),
+                         selector.SelectOptionDict(value="device_pulse", label="Timer locale già configurato nel dispositivo")],
+                mode=selector.SelectSelectorMode.DROPDOWN)),
+            vol.Required("pulse_seconds", default=2): vol.All(vol.Coerce(float), vol.Range(min=.5, max=5)),
+            vol.Optional("confirm_device_pulse", default=False): bool,
+            vol.Required("confirm", default=False): bool,
+        }))
 
+    async def async_step_add_shelly_gate(self, user_input=None):
+        """Configure a native Shelly relay and prepare its QR without opening it."""
+        from .gate_setup import async_add_shelly_gate, available_gate_relays
+        manager = self._manager()
+        if manager is None:
+            return self.async_abort(reason="not_ready")
+        errors = {}
+        if user_input is not None:
+            try:
+                if user_input.get("confirm") is not True:
+                    raise ValueError("Conferma la configurazione del relè.")
+                await async_add_shelly_gate(manager, name=user_input["name"],
+                    entity_id=user_input["entity_id"], seconds=user_input["pulse_seconds"],
+                    kind=user_input["kind"])
+            except (KeyError, TypeError, ValueError):
+                errors["base"] = "invalid_gate"
+            else:
+                return self.async_create_entry(title="", data=self._unchanged_options())
+        relays = available_gate_relays(manager)
+        if not relays:
+            return self.async_abort(reason="no_shelly")
         return self.async_show_form(
-            step_id="add_gate",
+            step_id="add_shelly_gate", errors=errors,
             data_schema=vol.Schema({
                 vol.Required("name"): str,
-                vol.Required("entity_id"): selector.EntitySelector(
-                    selector.EntitySelectorConfig(
-                        domain=["script", "button", "lock"], multiple=False
-                    )
-                ),
-                vol.Required("action", default="script.turn_on"): vol.In([
-                    "script.turn_on", "button.press", "lock.unlock"
-                ]),
-                vol.Required("kind", default="shared"): vol.In([
-                    "shared", "private"
-                ]),
+                vol.Required("entity_id"): selector.SelectSelector(selector.SelectSelectorConfig(
+                    options=[selector.SelectOptionDict(value=r["entity_id"], label=r["name"] + " · " + r["model"]) for r in relays],
+                    multiple=False, mode=selector.SelectSelectorMode.DROPDOWN)),
+                vol.Required("pulse_seconds", default=2): vol.All(vol.Coerce(float), vol.Range(min=.5, max=5)),
+                vol.Required("kind", default="private"): vol.In(["shared", "private"]),
+                vol.Required("confirm", default=False): bool,
             }),
-            errors=errors,
         )
 
     async def async_step_edit_gate(self, user_input=None):
@@ -251,6 +233,18 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
             defaults = {
                 key: gate[key] for key in ("name", "entity_id", "action", "kind")
             }
+            if "entity_binding" in gate:
+                from .entity_gate import resolve_binding
+                try:
+                    defaults["entity_id"] = resolve_binding(self.hass, gate["entity_binding"])
+                except ValueError:
+                    pass
+            if "shelly_binding" in gate:
+                from .shelly_gate import resolve_binding
+                try:
+                    defaults["entity_id"] = resolve_binding(self.hass, gate["shelly_binding"]).entity_id
+                except ValueError:
+                    pass  # Show saved data; an unavailable device cannot be reassigned here.
 
         if user_input is not None:
             try:
@@ -278,6 +272,8 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
                         current[key] != candidate[key]
                         for key in ("entity_id", "action", "kind")
                     )
+                    if "shelly_binding" in current or "entity_binding" in current:
+                        sensitive_change = native_mapping_changed(self.hass, current, candidate)
                     if sensitive_change:
                         # Do not silently change any active booking's door rights.
                         check_gate_removal(gate_id, manager.data["bookings"])
@@ -285,6 +281,8 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
                         current[key] = candidate[key]
                     if sensitive_change:
                         # Require deliberate re-enabling and invalidate old QR links.
+                        from .physical_admin import invalidate_gate_physical_credentials
+                        invalidate_gate_physical_credentials(manager, current["id"])
                         current["enabled"] = False
                         current["token"] = candidate["token"]
                         manager.demo_sessions.clear()
@@ -310,12 +308,12 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
                     "entity_id", default=defaults["entity_id"]
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(
-                        domain=["script", "button", "lock"], multiple=False
+                        domain=["script", "button", "lock", "switch", "input_button", "cover"], multiple=False
                     )
                 ),
                 vol.Required(
                     "action", default=defaults["action"]
-                ): vol.In(["script.turn_on", "button.press", "lock.unlock"]),
+                ): vol.In(["script.turn_on", "button.press", "lock.unlock", "lock.open", "switch.turn_on", "cover.open_cover", "input_button.press"]),
                 vol.Required("kind", default=defaults["kind"]): vol.In(
                     ["shared", "private"]
                 ),
@@ -398,3 +396,4 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
             errors=errors,
             description_placeholders={"gate_name": name},
         )
+

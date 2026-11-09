@@ -25,12 +25,11 @@
       },
       "access": {
         "title": "Accesso HTTPS e operatori",
-        "description": "Operatori attualmente salvati: {current_operators}. Puoi aggiungere o rimuovere gli utenti selezionati, quindi salvare. Gli amministratori hanno gia accesso completo. I QR restano limitati ai varchi virtuali. Il QR fisso è disabilitato per impostazione predefinita e opera solo su script virtuali approvati. I QR stampati restano validi finché non vengono revocati o ruotati dall'amministratore.",
+        "description": "Operatori salvati: {current_operators}. Gli amministratori configurano i varchi; gli operatori selezionati possono gestire prenotazioni, codici, QR delle porte e registro accessi. Le modifiche non cambiano i permessi delle prenotazioni esistenti.",
         "data": {
-          "public_pilot_enabled": "Abilita accesso temporaneo HTTPS",
-          "public_pilot_origin": "Indirizzo pubblico HTTPS (automatico da Home Assistant)",
-          "operator_user_ids": "Operatori B&B autorizzati",
-          "permanent_pilot_enabled": "Abilita QR permanente solo per varchi virtuali (pilota)"
+          "public_access_enabled": "Abilita accesso HTTPS degli ospiti",
+          "public_origin": "Indirizzo pubblico HTTPS (automatico da Home Assistant)",
+          "operator_user_ids": "Operatori B&B autorizzati"
         }
       },
       "gates": {
@@ -44,12 +43,9 @@
       },
       "add_gate": {
         "title": "Aggiungi varco",
-        "description": "Scegli un'entità Home Assistant già esistente e un'azione compatibile. Il varco viene creato disattivato per sicurezza; potrai verificarlo e abilitarlo dalla sezione Varchi.",
-        "data": {
-          "name": "Nome del varco",
-          "entity_id": "Entità Home Assistant",
-          "action": "Azione",
-          "kind": "Tipo di varco"
+        "menu_options": {
+          "add_entity_gate": "Entità Home Assistant (serratura, relè, pulsante, script, cancello)",
+          "add_shelly_gate": "Shelly con configurazione automatica"
         }
       },
       "remove_gate": {
@@ -82,18 +78,44 @@
           "action": "Azione",
           "kind": "Tipo di varco"
         }
+      },
+      "add_shelly_gate": {
+        "title": "Aggiungi varco",
+        "description": "Scegli un relè Shelly 1 Mini Gen3 già aggiunto a Home Assistant e la durata dell’impulso. La procedura configura e verifica lo spegnimento automatico, prepara il QR e lascia il varco inattivo. Nessun impulso viene inviato.",
+        "data": {
+          "name": "Nome del varco",
+          "entity_id": "Shelly / uscita",
+          "pulse_seconds": "Durata impulso (secondi)",
+          "kind": "Tipo di varco",
+          "confirm": "Confermo la configurazione del relè per un accesso ad impulso"
+        }
+      },
+      "add_entity_gate": {
+        "title": "Associa entità Home Assistant",
+        "description": "Seleziona entità e comando. Per le serrature distingui sblocco e apertura scrocco. Per i relè scegli impulso HA (dipende da HA/rete) oppure timer locale già verificato. Nessun comando viene inviato durante l’associazione; il varco resta inattivo. Il codice della prenotazione non viene inoltrato al dispositivo.",
+        "data": {
+          "name": "Nome varco",
+          "entity_id": "Entità apriporta",
+          "action": "Comando della porta",
+          "kind": "Tipo varco",
+          "switch_mode": "Gestione impulso (solo relè)",
+          "pulse_seconds": "Relè: durata impulso (secondi)",
+          "confirm_device_pulse": "Confermo il timer locale già configurato (solo device_pulse)",
+          "confirm": "Confermo entità e comando associati alla porta"
+        }
       }
     },
     "error": {
       "invalid_public_origin": "Indica un indirizzo HTTPS valido senza percorso o porta.",
       "invalid_operator_users": "Seleziona soltanto utenti Home Assistant attivi, non amministratori, fino a 20 operatori.",
-      "invalid_gate": "Controlla nome, entità, tipo e azione del varco. L'entità deve esistere e non può essere già associata.",
+      "invalid_gate": "Configurazione non completata. Verifica entità disponibile, comando supportato, nome e conferme. I relè devono essere OFF e gli script inattivi. Durata impulso: 0,5–5 secondi.",
       "gate_has_bookings": "Impossibile eliminare il varco: revoca prima le prenotazioni ancora valide che lo utilizzano."
     },
     "abort": {
       "not_ready": "Il gestore B&B non è ancora pronto. Riprova quando l'integrazione è caricata.",
       "no_gates": "Non ci sono varchi da eliminare.",
-      "invalid_gate": "Il varco selezionato non è più disponibile."
+      "invalid_gate": "Il varco selezionato non è più disponibile.",
+      "no_shelly": "Nessun relè compatibile pronto. Aggiungi uno Shelly 1 Mini Gen3 con l’integrazione Shelly ufficiale, verifica connessione e uscita OFF, poi riprova."
     }
   }
 }

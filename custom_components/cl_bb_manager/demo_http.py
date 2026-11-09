@@ -32,8 +32,7 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
             "<div class='result' role='status' aria-live='polite'>"
             "<span class='result-icon' aria-hidden='true'>✓</span>"
             "<strong>Richiesta completata</strong>"
-            + ("<p>Comando di apertura inviato; verifica la porta.</p></div>" if physical
-             else "<p>Operazione virtuale eseguita correttamente.</p></div>")
+            + "<p>Richiesta elaborata correttamente.</p></div>"
         )
     elif form_csrf:
         form_html = (
@@ -56,7 +55,7 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         "<meta name='robots' content='noindex,nofollow'>"
         "<meta name='referrer' content='strict-origin'>"
         "<meta name='theme-color' content='#061324'>"
-        "<title>CL Control · Accesso</title>"
+        "<title>CL B&B Manager · Accesso</title>"
         "<style>"
         "*{box-sizing:border-box}"
         ":root{color-scheme:dark;font-family:Inter,'Segoe UI',system-ui,-apple-system,sans-serif}"
@@ -106,15 +105,14 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         "@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}"
         "</style></head><body>"
         "<div class='wrap'><main>"
-        "<div class='brand'><img class='brand-logo' src='/cl_bb_manager_static/cl-impianti-logo.svg?v=0.5.0-alpha.17' alt='CL Impianti'><span class='brand-copy'>"
-        "<strong>CL CONTROL</strong><small>HOSPITALITY · ACCESSI</small></span></div>"
+        "<div class='brand'><img class='brand-logo' src='/cl_bb_manager_static/cl-impianti-logo.svg?v=0.6.0-beta.2' alt='CL Impianti'><span class='brand-copy'>"
+        "<strong>CL B&amp;B MANAGER</strong><small>ACCESSO OSPITI</small></span></div>"
         "<p class='eyebrow'>Accesso alla struttura</p>"
         f"<h1>{name}</h1><p class='description'>{info}</p>"
         f"{form_html}"
         "<div class='security'><span class='dot' aria-hidden='true'></span>"
-        "Codice protetto · Sessione temporanea</div>"
-        + ("</main><p class='disclaimer'>L'invio del comando non conferma lo sblocco della serratura.</p>"
-         if physical else "</main><p class='disclaimer'>Ambiente pilota: nessuna porta fisica viene comandata.</p>")
+        "Codice personale · Connessione protetta</div>"
+        + "</main><p class='disclaimer'>L'invio del comando non conferma lo sblocco della serratura.</p>"
         + "</div></body></html>"
     )
     return web.Response(
