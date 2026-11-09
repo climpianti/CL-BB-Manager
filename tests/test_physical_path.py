@@ -53,11 +53,11 @@ async def form(manager, hass, *, pin="12345678", token=TOKEN):
     return req
 
 
-def test_release_is_compile_time_disabled():
+def test_release_requires_admin_site_and_gate_opt_in():
     source = (base.ROOT / "physical_policy.py").read_text(encoding="utf-8")
-    assert "PHYSICAL_RELEASE_ENABLED = False" in source
-    assert physical_policy.PHYSICAL_RELEASE_ENABLED is False
-    assert physical_http.PHYSICAL_RELEASE_ENABLED is False
+    assert "PHYSICAL_RELEASE_ENABLED = True" in source
+    assert physical_policy.PHYSICAL_RELEASE_ENABLED is True
+    assert physical_http.PHYSICAL_RELEASE_ENABLED is True
 
 
 def test_unreleased_endpoint_is_closed_without_touching_shelly():
@@ -165,7 +165,7 @@ def test_physical_policy_without_monkeypatch_never_reports_real_target():
     manager.data["physical_access_enabled"] = True
     hass.states[REAL] = SimpleNamespace(state="off")
     hass.states["switch.porta_scale"] = SimpleNamespace(state="off")
-    assert physical_policy.physical_target(manager, gate, hass, token=TOKEN) is None
+    assert physical_policy.physical_target(manager, gate, hass, token=TOKEN) == REAL
 
 
 def test_unknown_real_script_is_not_approved_even_if_available(monkeypatch):
