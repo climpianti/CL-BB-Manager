@@ -75,12 +75,17 @@ def demo_target_allowed(gate: dict, allowlisted: set[str] | frozenset[str]) -> b
     )
 
 
-def candidate_bookings(bookings: list[dict], gate_id: str, now=None):
+def candidate_bookings(bookings: list[dict], gate_id: str, now=None, *, property_id=None):
     """Return bounded authorized candidates; fail closed under excess load."""
     from .models import booking_allows
+    from .property_scope import require_property_id
 
+    if property_id is not None:
+        require_property_id(property_id)
     candidates = []
     for booking in bookings:
+        if property_id is not None and booking.get("property_id") != property_id:
+            continue
         if booking_allows(booking, gate_id, now):
             candidates.append(booking)
             if len(candidates) > MAX_ACTIVE_CANDIDATES:
