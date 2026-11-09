@@ -1,6 +1,6 @@
 # CL B&B Manager
 
-**Versione 0.5.0-alpha.9 — QR fisso stampabile HTTPS in primo piano; QR temporaneo separato e marcato non stampabile. Solo varchi virtuali.**
+**Versione 0.5.0-alpha.10 — QR fisso stampabile HTTPS in primo piano; QR temporaneo separato e marcato non stampabile. Solo varchi virtuali.**
 
 Integrazione custom per Home Assistant, progettata da CL Impianti per la gestione di varchi, camere e prenotazioni nei B&B.
 
@@ -112,3 +112,10 @@ Nelle **opzioni dell'integrazione** attiva esplicitamente **QR permanente solo v
 Nella scheda **Accessi → Accesso da Internet** il riquadro **QR permanente stampabile · varchi virtuali** viene prima del riquadro **QR temporaneo · HTTPS · 10 minuti**. Il secondo continua a esistere solo per le prove a scadenza, e **non deve essere stampato**. Se il pannello permanente indica che è disabilitato, aprire **Impostazioni → Dispositivi e servizi → CL B&B Manager → Configura → Accesso HTTPS e operatori** e attivare la relativa opzione. Questa attivazione è **esplicita** e non viene abilitata automaticamente dall'aggiornamento.
 
 Se un QR temporaneo mostra `404 Not Found` dopo la scansione, verificare prima che non sia stato utilizzato o scaduto (10 minuti) e che si stia aprendo il dominio HTTPS configurato. Per i QR fissi il percorso è `/api/cl_bb_manager/permanent-demo/…`, diverso da `/api/cl_bb_manager/public-demo/…` usato dai QR monouso. Se un QR permanente presenta un 404, controllare l'opzione di abilitazione, il varco virtuale e il proxy HTTPS prima di dichiararlo funzionante. Non incollare il QR all'esterno su una porta fisica durante l'alpha.
+
+
+## Predisposizione Shelly reali (alpha.10, solo staging)
+
+L'amministratore può registrare uno script reale come **candidato hardware** di un varco tramite WebSocket `cl_bb_manager/stage_hardware_gate` con `gate_id` e `script_id`. L'operazione salva esclusivamente metadati non eseguibili e non cambia la mappatura del varco, il QR stampato, le prenotazioni o gli accessi. Solo l'amministratore vede la predisposizione nella scheda Varchi; `cl_bb_manager/clear_hardware_gate` elimina il candidato. Gli script candidati devono essere disponibili in Home Assistant e differenti da quelli virtuali. Non c'è alcun servizio nel QR pubblico che richiami un candidato hardware. `hardware_control: disabled` rimane invariato.
+
+**Per il pilota Bausan:** il varco Strada potrà essere associato a `script.cl_bb_porta_strada_impulso_locale`, Scala a `script.cl_bb_porta_scala_impulso_locale`. Questi script sono stati già testati manualmente e l'utente ha confermato lo scatto dei due dispositivi; ciò **non sostituisce** i test di sicurezza del percorso QR/PIN pubblico. La connessione definitiva al comando fisico resta bloccata fino alla verifica indipendente dei controlli HTTPS, PIN, brute-force, revoca, replay, disponibilità e log.
