@@ -1,5 +1,5 @@
 class ClBbManagerPanel extends HTMLElement {
- constructor(){super();this.attachShadow({mode:"open"});this.loaded=false;this.tab="dashboard";this.data=null;this.error="";this.pin="";this.testResult=null;this.testBusy=false;this.demoQR=null;this.permanentQR=null;this.demoTargetGateId=null;this.qrMode="https";}
+ constructor(){super();this.attachShadow({mode:"open"});this.loaded=false;this.tab="dashboard";this.data=null;this.error="";this.pin="";this.testResult=null;this.testBusy=false;this.demoQR=null;this.permanentQR=null;this.physicalQR=null;this.demoTargetGateId=null;this.qrMode="https";}
  set hass(h){this._hass=h;if(!this.loaded){this.loaded=true;this.load();}}
  api(type,body={}){return this._hass.callWS({type:"cl_bb_manager/"+type,...body});}
  async load(){try{this.data=await this.api("list");this.error="";}catch(e){this.error=this.describeError(e);}this.render();}
@@ -71,7 +71,7 @@ class ClBbManagerPanel extends HTMLElement {
    const security=this.card("Sicurezza e modalità di accesso");
    security.append(this.node("p","QR HTTPS temporanei: "+(this.data.public_pilot==="enabled"?"Abilitati":"Disabilitati")));
    security.append(this.node("p","QR fisso HTTPS virtuale: "+(this.data.permanent_pilot==="enabled"?"Abilitato (pilota)":"Disabilitato")));
-   security.append(this.node("p","Serrature e attuatori fisici: non collegati"));
+   security.append(this.node("p","Serrature e attuatori fisici: "+(this.data.hardware_control==="enabled"?"QR attivo su almeno un varco":"QR disabilitato")));
    security.append(this.node("p","I QR temporanei durano 10 minuti e, dopo un comando riuscito, non sono riutilizzabili. In questa versione funzionano esclusivamente con gli script virtuali consentiti.","small"));
    grid.append(security);
  }
@@ -277,6 +277,8 @@ class ClBbManagerPanel extends HTMLElement {
       grid.append(fixed);
     }
 
+   if(this.qrMode==="https" && this.data.role==="admin")this.physicalAccess(grid);
+
    // The printable QR is the primary choice. Show the temporary demo beneath it.
    if(this.qrMode==="https")grid.append(publicCard);
    const qrCard=this.card("QR di accesso · rete locale");
@@ -345,8 +347,85 @@ class ClBbManagerPanel extends HTMLElement {
    const info=this.card("Informazioni di servizio");
    info.append(this.node("p","QR permanente HTTPS: "+(this.data.permanent_pilot==="enabled"?"abilitato (solo demo virtuale)":"disabilitato"),"small"),
                this.node("p","Collegamenti autorizzati: soltanto script virtuali","small"),
-               this.node("p","Comandi verso serrature fisiche: disattivati","small"));
+               this.node("p","QR fisico: "+(this.data.hardware_control==="enabled"?"abilitato su almeno un varco":"disabilitato"),"small"));
    grid.append(info);
+ }
+ physicalAccess(grid){
+   const card=this.card("QR fisico permanente · Shelly");
+   card.append(this.node("p","QR fisico distinto da quello demo: il codice stampato non scade, ma ogni apertura richiede un PIN valido e il permesso della prenotazione. La disattivazione manuale rimane disponibile in ogni momento.","small"));
+   const gates=this.data.gates.filter(g=>g.hardware_candidate && g.enabled);
+   if(!gates.length){card.append(this.node("p","Nessun varco Shelly predisposto.","notice"));grid.append(card);return;}
+   const selectForm=this.node("form");
+   this.select(selectForm,"Porta fisica","gate_id",gates.map(g=>[g.id,g.name]),this.demoTargetGateId||gates[0].id);
+   const chosen=selectForm.querySelector('select[name="gate_id"]');
+   chosen.addEventListener("change",()=>{this.demoTargetGateId=chosen.value;this.physicalQR=null;this.render();});
+   selectForm.addEventListener("submit",e=>e.preventDefault());
+   card.append(selectForm);
+   const gateId=this.demoTargetGateId && gates.some(g=>g.id===this.demoTargetGateId)?this.demoTargetGateId:gates[0].id;
+   const gate=gates.find(g=>g.id===gateId);
+   card.append(this.node("p","Stato porta: "+(gate.physical_enabled && this.data.hardware_control==="enabled"?"QR fisico attivo":"Disabilitata")+(gate.physical_qr_prepared?" · QR predisposto":" · QR non predisposto"),"small"));
+   const actions=this.node("div","","nav");
+   const work=async(type,body,message,resetQR=false)=>{
+      if(this.testBusy)return;
+      this.testBusy=true;
+      try{
+        const result=await this.api(type,{...body,confirm:true});
+        if(resetQR)this.physicalQR=null;
+        this.error=message||"Operazione completata.";
+        await this.load();
+        return result;
+      }catch(e){this.error=this.describeError(e);this.render();return null;}
+      finally{this.testBusy=false;}
+   };
+   actions.append(this.button("Prepara nuovo QR fisico",async()=>{
+     if(!confirm("Un nuovo QR sostituirà quello fisico precedente. Non apre la porta finché non viene abilitato. Procedere?"))return;
+     if(this.testBusy)return;
+     this.testBusy=true;
+     try{
+       const result=await this.api("prepare_physical_qr",{gate_id:gateId,confirm:true});
+       this.physicalQR={...result,gate_id:gateId,gate:gate.name};
+       this.error="QR fisico preparato. Abilita solo dopo aver concesso un PIN di prova.";
+       await this.load();
+     }catch(e){this.error=this.describeError(e);this.render();}
+     finally{this.testBusy=false;}
+   }));
+   const bookings=this.data.bookings.filter(b=>!b.revoked && b.gate_ids?.includes(gateId) && new Date(b.end)>new Date());
+   if(bookings.length){
+     const grant=this.node("form");
+     this.select(grant,"Prenotazione da abilitare fisicamente","booking_id",bookings.map(b=>[b.id,b.room+" · "+new Date(b.end).toLocaleDateString("it-IT")]),bookings[0].id);
+     const grantBtn=this.node("button","Concedi accesso fisico al PIN");grantBtn.type="submit";grant.append(grantBtn);
+     grant.onsubmit=async(e)=>{
+       e.preventDefault();const booking_id=grant.querySelector('select[name="booking_id"]').value;
+       if(!confirm("Concedere alla prenotazione selezionata il permesso di aprire fisicamente "+gate.name+" con il PIN?"))return;
+       await work("grant_physical_booking",{booking_id,gate_id:gateId},"Permesso fisico concesso.");
+     };
+     card.append(grant);
+   }else{card.append(this.node("p","Nessuna prenotazione attiva o futura per questa porta. Crea una prenotazione di prova in Prenotazioni.","notice"));}
+   actions.append(this.button("Attiva QR fisico senza scadenza",async()=>{
+     if(!confirm("ATTENZIONE: da Internet un ospite con PIN valido e permesso fisico potrà aprire realmente "+gate.name+". L'attivazione NON scade. Confermi?"))return;
+     await work("arm_physical_gate",{gate_id:gateId},"QR fisico attivato senza scadenza.");
+   }));
+   actions.append(this.button("Disattiva questa porta",async()=>{
+     if(!confirm("Disabilitare subito le aperture QR fisiche per "+gate.name+"? Il QR rimane stampabile per eventuale riattivazione."))return;
+     await work("disarm_physical_gate",{gate_id:gateId},"Porta fisica disabilitata.");
+   }));
+   actions.append(this.button("BLOCCO EMERGENZA · Tutte le porte",async()=>{
+     if(!confirm("Revocare tutti i QR fisici e permessi di apertura? I QR stampati andranno sostituiti. Confermi?"))return;
+     await work("emergency_disable_physical",{},"Tutti gli accessi QR fisici sono stati revocati.",true);
+   }));
+   card.append(actions);
+   if(this.physicalQR && this.physicalQR.gate_id===gateId){
+     const preview=this.node("div");
+     const img=this.node("img");img.width=260;img.height=260;
+     img.alt="QR fisico permanente per "+gate.name;
+     const svgData="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(this.physicalQR.svg);
+     img.src=svgData;preview.append(img);
+     preview.append(this.node("p","QR fisico dedicato. Da consegnare solo dopo collaudo; rimane valido finché non viene revocato.","small"));
+     const dl=this.node("a","Scarica QR fisico SVG");dl.href=svgData;dl.download="CL-BB-FISICO-"+gateId+".svg";preview.append(dl);
+     const link=this.node("a","Apri pagina fisica");link.href=this.physicalQR.url;link.target="_blank";link.rel="noopener noreferrer";preview.append(link);
+     card.append(preview);
+   }
+   grid.append(card);
  }
  events(grid){
    const history=this.card("Registro accessi");
