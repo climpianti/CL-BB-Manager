@@ -13,7 +13,7 @@ from homeassistant.components.http import HomeAssistantView
 
 from .const import DOMAIN
 from .access_history import add_access_event
-from .demo_http import _response
+from .demo_http import _response, _security_rejection
 from .models import pin_matches
 from .permanent_policy import consume_form, issue_form
 from .physical_policy import (
@@ -90,12 +90,16 @@ class PhysicalGuestView(HomeAssistantView):
             request.headers.get("Origin"),
             request.headers.get("Sec-Fetch-Site"), origin,
         ):
-            raise web.HTTPForbidden()
+            return _security_rejection(
+                gate["name"], route="physical", reason="origin", physical=True,
+            )
 
         async with manager.lock:
             # Verify the same gate, token, authorization and script at call time.
             if not consume_form(manager.physical_forms, csrf, gate["id"]):
-                raise web.HTTPForbidden()
+                return _security_rejection(
+                    gate["name"], route="physical", reason="csrf", physical=True,
+                )
             script_id = physical_target(manager, gate, hass, token=token)
             if script_id is None:
                 raise web.HTTPNotFound()
@@ -160,3 +164,4 @@ class PhysicalGuestView(HomeAssistantView):
             "Comando inviato. Verifica l'apertura della porta.",
             complete=True, physical=True,
         )
+

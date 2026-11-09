@@ -6,6 +6,7 @@ temporary session created by an authenticated HA administrator.
 from __future__ import annotations
 
 from html import escape
+import logging
 import secrets
 
 from aiohttp import web
@@ -18,6 +19,8 @@ from .guest import DEMO_SCRIPTS
 from .models import pin_matches
 from .property_scope import belongs_to_property
 from .security import candidate_bookings, charge_attempt, demo_target_allowed
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf: str = "", complete: bool = False, physical: bool = False) -> web.Response:
@@ -32,7 +35,7 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
             + ("<p>Comando di apertura inviato; verifica la porta.</p></div>" if physical
              else "<p>Operazione virtuale eseguita correttamente.</p></div>")
         )
-    else:
+    elif form_csrf:
         form_html = (
             "<form method='post' autocomplete='off'>"
             f"<input type='hidden' name='form_csrf' value='{escape(form_csrf, quote=True)}'>"
@@ -43,11 +46,15 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
             "<button type='submit'>Continua <span aria-hidden='true'>→</span></button>"
             "</form>"
         )
+    else:
+        # A consumed/expired nonce cannot be reused. An ordinary link performs
+        # a fresh GET on the same QR URL without replaying the previous POST.
+        form_html = "<a class='retry' href=''>Riapri la pagina PIN</a>"
     document = (
         "<!doctype html><html lang='it'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         "<meta name='robots' content='noindex,nofollow'>"
-        "<meta name='referrer' content='no-referrer'>"
+        "<meta name='referrer' content='strict-origin'>"
         "<meta name='theme-color' content='#061324'>"
         "<title>CL Control · Accesso</title>"
         "<style>"
@@ -78,13 +85,13 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         "input{width:100%;height:57px;border:1px solid #5b9dc2;"
         "border-radius:13px;background:#061b30c9;color:#fff;padding:12px 16px;"
         "font-size:23px;font-weight:700;line-height:1.3;font-family:inherit;letter-spacing:.22em;text-align:center}"
-        "input::placeholder{color:#729bb4}input:focus-visible,button:focus-visible{outline:2px solid #19baff;outline-offset:3px}"
-        "button{border:1px solid #5ed8ff7d;border-radius:13px;"
+        "input::placeholder{color:#729bb4}input:focus-visible,button:focus-visible,.retry:focus-visible{outline:2px solid #19baff;outline-offset:3px}"
+        "button,.retry{border:1px solid #5ed8ff7d;border-radius:13px;text-decoration:none;"
         "background:linear-gradient(120deg,#1bb5ed,#1379b6);color:white;"
         "font-size:16px;font-weight:700;line-height:1.4;font-family:inherit;padding:16px 20px;cursor:pointer;"
         "display:flex;align-items:center;justify-content:space-between;gap:14px;"
         "box-shadow:0 9px 25px #19baff35}"
-        "button:hover{background:linear-gradient(120deg,#36c8fb,#158bca)}"
+        "button:hover,.retry:hover{background:linear-gradient(120deg,#36c8fb,#158bca)}"
         ".result{display:grid;justify-items:center;text-align:center;gap:10px;"
         "background:#32e39412;border:1px solid #32e39465;border-radius:17px;padding:24px}"
         ".result-icon{display:grid;place-items:center;width:49px;height:49px;border-radius:50%;"
@@ -99,7 +106,7 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         "@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}"
         "</style></head><body>"
         "<div class='wrap'><main>"
-        "<div class='brand'><img class='brand-logo' src='/cl_bb_manager_static/cl-impianti-logo.svg?v=0.5.0-alpha.4' alt='CL Impianti'><span class='brand-copy'>"
+        "<div class='brand'><img class='brand-logo' src='/cl_bb_manager_static/cl-impianti-logo.svg?v=0.5.0-alpha.17' alt='CL Impianti'><span class='brand-copy'>"
         "<strong>CL CONTROL</strong><small>HOSPITALITY · ACCESSI</small></span></div>"
         "<p class='eyebrow'>Accesso alla struttura</p>"
         f"<h1>{name}</h1><p class='description'>{info}</p>"
@@ -116,13 +123,32 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
             "Cache-Control": "no-store",
             "Pragma": "no-cache",
             "X-Content-Type-Options": "nosniff",
-            "Referrer-Policy": "no-referrer",
+            # no-referrer makes native form POSTs send Origin: null, which the
+            # HTTPS origin guard correctly rejects. Send only the origin:
+            # neither the QR path/token nor query parameters become Referer.
+            "Referrer-Policy": "strict-origin",
             "X-Frame-Options": "DENY",
             "Content-Security-Policy":
                 "default-src 'none'; style-src 'unsafe-inline';"
                 " img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
         },
     )
+
+
+def _security_rejection(gate_name: str, *, route: str, reason: str,
+                        physical: bool = False) -> web.Response:
+    """Explain a failed guard without logging PINs, nonces, URLs or headers.
+
+    route and reason are fixed server-side categories, never request values.
+    The response keeps HTTP 403 and does not issue a replacement form nonce.
+    """
+    _LOGGER.warning("CL B&B PIN form rejected: route=%s reason=%s", route, reason)
+    message = (
+        "Origine non autorizzata. Riapri la pagina PIN dal QR."
+        if reason == "origin"
+        else "Sessione scaduta o già utilizzata. Riapri la pagina PIN."
+    )
+    return _response(gate_name, message, 403, physical=physical)
 
 
 def _session_and_gate(request, token: str):
@@ -261,3 +287,4 @@ class DemoPortalView(HomeAssistantView):
             await manager.async_save()
 
         return _response(gate["name"], "Accesso autorizzato.", complete=True)
+

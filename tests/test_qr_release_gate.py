@@ -70,8 +70,7 @@ def test_invalid_pin_consumes_nonce_preventing_later_valid_reuse():
         denied = await view.post(form, TOKEN)
         assert denied.status == 403
         form.pin = "12345678"
-        with pytest.raises(web.HTTPForbidden):
-            await view.post(form, TOKEN)
+        assert (await view.post(form, TOKEN)).status == 403
         assert hass.calls == []
     run(exercise())
 
@@ -92,8 +91,7 @@ def test_wrong_origin_or_fetch_metadata_blocks_correct_pin(
             manager, hass, origin=bad_origin
         )
         form.headers["Sec-Fetch-Site"] = fetch_site
-        with pytest.raises(web.HTTPForbidden):
-            await view_module.PermanentPilotView().post(form, TOKEN)
+        assert (await view_module.PermanentPilotView().post(form, TOKEN)).status == 403
         assert hass.calls == []
     run(exercise())
 
@@ -118,12 +116,10 @@ def test_csrf_missing_invalid_and_expired_are_all_denied():
         for invalid in ("", "A" * 43):
             form = await permanent_test.form_request(manager, hass)
             form.csrf = invalid
-            with pytest.raises(web.HTTPForbidden):
-                await view.post(form, TOKEN)
+            assert (await view.post(form, TOKEN)).status == 403
         form = await permanent_test.form_request(manager, hass)
         manager.permanent_forms[form.csrf]["expires"] = 0
-        with pytest.raises(web.HTTPForbidden):
-            await view.post(form, TOKEN)
+        assert (await view.post(form, TOKEN)).status == 403
         assert hass.calls == []
     run(exercise())
 
@@ -212,3 +208,4 @@ def test_disabled_virtual_gate_blocks_qr():
             )
         assert hass.calls == []
     run(exercise())
+

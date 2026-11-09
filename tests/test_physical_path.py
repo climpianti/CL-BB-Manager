@@ -89,8 +89,8 @@ def test_hypothetical_authorized_flow_is_once_only_with_cooldown(monkeypatch):
         assert result.status == 200
         assert "non conferma" in result.text
         assert [call[2]["entity_id"] for call in hass.calls] == [REAL]
-        with pytest.raises(web.HTTPForbidden):
-            await physical_http.PhysicalGuestView().post(request, TOKEN)
+        assert (await physical_http.PhysicalGuestView().post(request, TOKEN)).status == 403
+        assert len(hass.calls) == 1
         request2 = await form(manager, hass)
         held = await physical_http.PhysicalGuestView().post(request2, TOKEN)
         assert held.status == 429
@@ -146,8 +146,7 @@ def test_cross_site_request_rejected_before_hardware(monkeypatch):
         manager, hass = setup(monkeypatch)
         request = await form(manager, hass)
         request.headers["Origin"] = "https://evil.example.org"
-        with pytest.raises(web.HTTPForbidden):
-            await physical_http.PhysicalGuestView().post(request, TOKEN)
+        assert (await physical_http.PhysicalGuestView().post(request, TOKEN)).status == 403
         assert hass.calls == []
     asyncio.run(check())
 
@@ -199,3 +198,4 @@ def test_cooldown_rejects_invalid_clock(bad):
 def test_cooldown_rejects_corrupt_saved_timestamp(bad):
     data = {"physical_last_action": {"gate": bad}}
     assert physical_policy.take_cooldown(data, "gate", now=5000) is False
+

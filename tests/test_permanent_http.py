@@ -54,8 +54,8 @@ def test_qr_survives_repeated_visits_and_only_virtual_script_runs():
         )
         assert manager.data["access_history"][-1]["result"] == "authorized"
         assert manager.data["access_history"][-1]["property_id"] == manager.property_id
-        with pytest.raises(web.HTTPForbidden):
-            await view.post(r1, GATE_TOKEN)
+        assert (await view.post(r1, GATE_TOKEN)).status == 403
+        assert len(hass.calls) == 1
         r2 = await form_request(manager, hass)
         second = await view.post(r2, GATE_TOKEN)
         assert second.status == 200
@@ -68,8 +68,8 @@ def test_qr_survives_home_assistant_restart_with_fresh_nonce():
         manager, hass = fixture()
         first = await form_request(manager, hass)
         manager.permanent_forms = {}  # Restart invalidates only forms.
-        with pytest.raises(web.HTTPForbidden):
-            await permanent.PermanentPilotView().post(first, GATE_TOKEN)
+        assert (await permanent.PermanentPilotView().post(first, GATE_TOKEN)).status == 403
+        assert hass.calls == []
         again = await form_request(manager, hass)
         assert (await permanent.PermanentPilotView().post(again, GATE_TOKEN)).status == 200
     asyncio.run(run())
@@ -104,8 +104,7 @@ def test_wrong_origin_and_disabled_portal_fail_closed():
         manager, hass = fixture()
         view = permanent.PermanentPilotView()
         r = await form_request(manager, hass, origin="https://evil.example.org")
-        with pytest.raises(web.HTTPForbidden):
-            await view.post(r, GATE_TOKEN)
+        assert (await view.post(r, GATE_TOKEN)).status == 403
         manager.entry.options["permanent_pilot_enabled"] = False
         with pytest.raises(web.HTTPNotFound):
             await view.get(request(hass), GATE_TOKEN)
@@ -117,3 +116,4 @@ def test_wrong_origin_and_disabled_portal_fail_closed():
             await view.get(request(hass), GATE_TOKEN)
         assert hass.calls == []
     asyncio.run(run())
+

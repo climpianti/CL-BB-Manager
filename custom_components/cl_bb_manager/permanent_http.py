@@ -12,7 +12,7 @@ from homeassistant.components.http import HomeAssistantView
 
 from .access_history import add_access_event
 from .const import DOMAIN
-from .demo_http import _response
+from .demo_http import _response, _security_rejection
 from .guest import DEMO_SCRIPTS
 from .models import pin_matches
 from .permanent_policy import consume_form, issue_form
@@ -95,12 +95,16 @@ class PermanentPilotView(HomeAssistantView):
             request.headers.get("Sec-Fetch-Site"),
             origin,
         ):
-            raise web.HTTPForbidden()
+            return _security_rejection(
+                gate["name"], route="permanent-demo", reason="origin",
+            )
 
         async with manager.lock:
             # A nonce never authorizes a second POST, even after an incorrect PIN.
             if not consume_form(manager.permanent_forms, csrf, gate["id"]):
-                raise web.HTTPForbidden()
+                return _security_rejection(
+                    gate["name"], route="permanent-demo", reason="csrf",
+                )
             current = next(
                 (g for g in manager.data["gates"] if g["id"] == gate["id"]), None
             )
@@ -161,3 +165,4 @@ class PermanentPilotView(HomeAssistantView):
             )
             await manager.async_save()
         return _response(gate["name"], "Accesso virtuale autorizzato.", complete=True)
+
