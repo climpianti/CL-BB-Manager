@@ -58,7 +58,7 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
                     raise ValueError("Varco non disponibile.")
                 gate = matches[0]
                 require_record_scope(gate, manager.property_id)
-                if gate.get("enabled") is not True and "shelly_binding" not in gate:
+                if gate.get("enabled") is not True and not any(key in gate for key in ("shelly_binding", "entity_binding")):
                     raise ValueError("Varco disabilitato.")
                 if ready_actuator(gate, hass) is None:
                     raise ValueError("Dispositivo del varco non pronto.")
@@ -188,11 +188,17 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
                 had_global = "physical_access_enabled" in manager.data
                 previous_global = manager.data.get("physical_access_enabled", False)
                 previous_events = deepcopy(manager.data["events"])
-                if "shelly_binding" in gate:
+                if any(key in gate for key in ("shelly_binding", "entity_binding")):
                     if msg.get("confirm_wiring") is not True:
                         raise ValueError("Conferma la verifica del collegamento e della durata dell'impulso.")
-                    from .shelly_gate import async_validate
-                    await async_validate(hass, gate["shelly_binding"])
+                    if "shelly_binding" in gate:
+                        from .shelly_gate import async_validate
+                        await async_validate(hass, gate["shelly_binding"])
+                    else:
+                        from .entity_gate import resolve_binding
+                        resolve_binding(hass, gate["entity_binding"])
+                        if gate['id'] in manager.data.get('pending_entity_pulses', {}):
+                            raise ValueError('Ripristina il precedente impulso prima di abilitare il varco.')
                     # No test booking is needed to commission a new installation.
                     # Every opening still needs its own currently eligible booking.
                     gate["enabled"] = True

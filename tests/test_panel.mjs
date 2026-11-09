@@ -19,7 +19,7 @@ function setup(response=snapshot(),overrides={}){
  context.FormData=class{constructor(form){this.values=[...form.querySelectorAll("input,select")].filter(n=>n.name).map(n=>[n.name,n.value]);}get(name){return this.values.find(([key])=>key===name)?.[1];}[Symbol.iterator](){return this.values[Symbol.iterator]();}};
  runInNewContext(source,context);
  const panel=document.createElement("cl-bb-manager-panel");document.body.append(panel);
- const hass={user:{id:"current-user"},connection:{},callWS:async request=>{calls.push(request);if(request.type==="cl_bb_manager/list")return typeof response==="function"?response(request):response;if(request.type==="cl_bb_manager/shelly_relays")return {relays:[{entity_id:"switch.new_door",name:"New door",model:"Shelly 1 Mini Gen3"}]};if(request.type==="cl_bb_manager/physical_qr")return {gate_id:"door-a",name:"Entrance",svg:"<svg/>"};return snapshot();}};
+ const hass={user:{id:"current-user"},connection:{},callWS:async request=>{calls.push(request);if(request.type==="cl_bb_manager/list")return typeof response==="function"?response(request):response;if(request.type==="cl_bb_manager/shelly_relays")return {relays:[{entity_id:"switch.new_door",name:"New door",model:"Shelly 1 Mini Gen3"}]};if(request.type==="cl_bb_manager/door_entities")return {entities:[{entity_id:"lock.porta_d_ingresso_yale_linus_l2_3",name:"Yale",actions:[{action:"lock.unlock",label:"Sblocca serratura"},{action:"lock.open",label:"Apri scrocco"}]},{entity_id:"switch.rele_altra_marca",name:"Relè",actions:[{action:"switch.turn_on",label:"Impulso relè"}]}]};if(request.type==="cl_bb_manager/physical_qr")return {gate_id:"door-a",name:"Entrance",svg:"<svg/>"};return snapshot();}};
  return {panel,hass,calls,document,Panel,context};
 }
 function button(panel,text){return [...panel.shadowRoot.querySelectorAll("button")].find(n=>n.textContent===text);}
@@ -104,4 +104,24 @@ test("BlueTech Glass stylesheet retains responsive layout and keyboard focus",()
 test("Error messages support both WS envelopes and a readable fallback",()=>{
  const {Panel}=setup();assert.equal(Panel.prototype.describeError({error:{message:"Invalid request"}}),"Invalid request");
  assert.match(Panel.prototype.describeError({code:"unknown"}),/Operazione non riuscita/);
+});
+
+
+test("Generic setup offers a Yale lock and sends a typed, inactive association",async()=>{
+ const {panel,hass,calls}=setup();panel.hass=hass;await settle();panel.go("varchi");button(panel,"Cerca entità apriporta").click();await settle();
+ const form=panel.shadowRoot.querySelector('select[name="action"]').closest("form");form.reportValidity=()=>true;form.querySelector('[name="name"]').value="Yale ingresso";
+ assert.match(form.textContent,/Sblocca serratura/);assert.match(form.textContent,/Apri scrocco/);
+ form.dispatchEvent(new panel.ownerDocument.defaultView.Event("submit",{cancelable:true}));await settle();
+ const request=calls.find(r=>r.type==="cl_bb_manager/add_entity_gate");assert.ok(request);
+ assert.equal(request.entity_id,"lock.porta_d_ingresso_yale_linus_l2_3");assert.equal(request.action,"lock.unlock");assert.equal(request.confirm,true);
+ assert.ok(!calls.some(r=>/arm_physical|unlock|press|open_cover/.test(r.type)));
+});
+
+test("Generic relay requires explicit local-timer confirmation when selected",async()=>{
+ const {panel,hass,calls}=setup();panel.hass=hass;await settle();panel.go("varchi");button(panel,"Cerca entità apriporta").click();await settle();
+ const form=panel.shadowRoot.querySelector('select[name="action"]').closest("form");form.reportValidity=()=>true;
+ const entity=form.querySelector('[name="entity_id"]');entity.querySelectorAll("option").forEach(o=>o.selected=o.value==="switch.rele_altra_marca");entity.dispatchEvent(new panel.ownerDocument.defaultView.Event("change"));
+ const mode=form.querySelector('[name="switch_mode"]');mode.querySelectorAll("option").forEach(o=>o.selected=o.value==="device_pulse");
+ form.dispatchEvent(new panel.ownerDocument.defaultView.Event("submit",{cancelable:true}));await settle();
+ assert.match(form.textContent,/Conferma che il timer locale/);assert.ok(!calls.some(r=>r.type==="cl_bb_manager/add_entity_gate"));
 });

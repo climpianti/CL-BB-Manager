@@ -106,6 +106,44 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
         )
 
     async def async_step_add_gate(self, user_input=None):
+        return self.async_show_menu(step_id="add_gate", menu_options=["add_entity_gate", "add_shelly_gate"])
+
+    async def async_step_add_entity_gate(self, user_input=None):
+        from .gate_setup import async_add_entity_gate
+        from .entity_gate import ACTIONS
+        manager = self._manager()
+        if manager is None:
+            return self.async_abort(reason="not_ready")
+        errors = {}
+        if user_input is not None:
+            try:
+                if user_input.get("confirm") is not True:
+                    raise ValueError("Conferma l'associazione del varco.")
+                await async_add_entity_gate(manager, name=user_input["name"], entity_id=user_input["entity_id"],
+                    action=user_input["action"], kind=user_input["kind"], seconds=user_input.get("pulse_seconds", 2),
+                    switch_mode=user_input.get("switch_mode", "ha_pulse"),
+                    confirm_device_pulse=user_input.get("confirm_device_pulse", False))
+            except (KeyError, TypeError, ValueError):
+                errors["base"] = "invalid_gate"
+            else:
+                return self.async_create_entry(title="", data=self._unchanged_options())
+        return self.async_show_form(step_id="add_entity_gate", errors=errors, data_schema=vol.Schema({
+            vol.Required("name"): str,
+            vol.Required("entity_id"): selector.EntitySelector(selector.EntitySelectorConfig(domain=list(dict.fromkeys(domain for domain, label in ACTIONS.values())))),
+            vol.Required("action", default="lock.unlock"): selector.SelectSelector(selector.SelectSelectorConfig(
+                options=[selector.SelectOptionDict(value=action, label=label) for action, (domain, label) in ACTIONS.items()],
+                mode=selector.SelectSelectorMode.DROPDOWN)),
+            vol.Required("kind", default="private"): vol.In(["private", "shared"]),
+            vol.Required("switch_mode", default="ha_pulse"): selector.SelectSelector(selector.SelectSelectorConfig(
+                options=[selector.SelectOptionDict(value="ha_pulse", label="Impulso gestito da Home Assistant"),
+                         selector.SelectOptionDict(value="device_pulse", label="Timer locale già configurato nel dispositivo")],
+                mode=selector.SelectSelectorMode.DROPDOWN)),
+            vol.Required("pulse_seconds", default=2): vol.All(vol.Coerce(float), vol.Range(min=.5, max=5)),
+            vol.Optional("confirm_device_pulse", default=False): bool,
+            vol.Required("confirm", default=False): bool,
+        }))
+
+    async def async_step_add_shelly_gate(self, user_input=None):
         """Configure a native Shelly relay and prepare its QR without opening it."""
         from .gate_setup import async_add_shelly_gate, available_gate_relays
         manager = self._manager()
@@ -127,7 +165,7 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
         if not relays:
             return self.async_abort(reason="no_shelly")
         return self.async_show_form(
-            step_id="add_gate", errors=errors,
+            step_id="add_shelly_gate", errors=errors,
             data_schema=vol.Schema({
                 vol.Required("name"): str,
                 vol.Required("entity_id"): selector.SelectSelector(selector.SelectSelectorConfig(
@@ -195,6 +233,12 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
             defaults = {
                 key: gate[key] for key in ("name", "entity_id", "action", "kind")
             }
+            if "entity_binding" in gate:
+                from .entity_gate import resolve_binding
+                try:
+                    defaults["entity_id"] = resolve_binding(self.hass, gate["entity_binding"])
+                except ValueError:
+                    pass
             if "shelly_binding" in gate:
                 from .shelly_gate import resolve_binding
                 try:
@@ -228,7 +272,7 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
                         current[key] != candidate[key]
                         for key in ("entity_id", "action", "kind")
                     )
-                    if "shelly_binding" in current:
+                    if "shelly_binding" in current or "entity_binding" in current:
                         sensitive_change = native_mapping_changed(self.hass, current, candidate)
                     if sensitive_change:
                         # Do not silently change any active booking's door rights.
@@ -264,12 +308,12 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
                     "entity_id", default=defaults["entity_id"]
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(
-                        domain=["script", "button", "lock", "switch"], multiple=False
+                        domain=["script", "button", "lock", "switch", "input_button", "cover"], multiple=False
                     )
                 ),
                 vol.Required(
                     "action", default=defaults["action"]
-                ): vol.In(["script.turn_on", "button.press", "lock.unlock", "switch.turn_on"]),
+                ): vol.In(["script.turn_on", "button.press", "lock.unlock", "lock.open", "switch.turn_on", "cover.open_cover", "input_button.press"]),
                 vol.Required("kind", default=defaults["kind"]): vol.In(
                     ["shared", "private"]
                 ),

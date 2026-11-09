@@ -58,6 +58,14 @@ def physical_target(manager, gate: dict, hass, *, token: str | None = None):
 
 def ready_actuator(gate: dict, hass):
     """Resolve a configured actuator without changing enablement or devices."""
+    if "entity_binding" in gate:
+        from .entity_gate import resolve_binding
+        if gate.get('action') != gate['entity_binding'].get('action'):
+            return None
+        try:
+            return resolve_binding(hass, gate['entity_binding'])
+        except (ValueError, TypeError, KeyError, AttributeError):
+            return None
     if "shelly_binding" in gate:
         from .shelly_gate import resolve_binding
         if gate.get("action") != "switch.turn_on":

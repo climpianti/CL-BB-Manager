@@ -228,3 +228,56 @@ def test_failed_arm_save_stays_disabled_and_revoked_native_qr_can_be_reprepared(
         assert not gate['physical_enabled'] and not gate['enabled']
         assert not any(method=='Switch.Set' for method,_ in rpc.calls)
     asyncio.run(run())
+
+
+@pytest.mark.parametrize('entity,action,expected',[
+    ('lock.porta_d_ingresso_yale_linus_l2_3','lock.unlock',['unlock']),
+    ('lock.porta_d_ingresso_yale_linus_l2_3','lock.open',['open']),
+    ('switch.rele_altra_marca','switch.turn_on',['turn_on','turn_off']),
+])
+@pytest.mark.filterwarnings('ignore:It is recommended to use web.AppKey instances for keys')
+def test_generic_operator_booking_to_real_http_handlers_uses_only_selected_fake_entity(monkeypatch,entity,action,expected):
+    async def run():
+        import test_entity_gate as generic
+        module,hass,entry,handlers,views,panels,rpc,registry=harness(monkeypatch)
+        registry.entities[native.ENTITY].id='native-registry'
+        hass.states[entity]=SimpleNamespace(entity_id=entity,state='off' if entity.startswith('switch.') else 'locked',attributes={'supported_features':1})
+        registry.entities[entity]=SimpleNamespace(id='generic-registry',entity_id=entity,unique_id='generic-identity',platform='different-brand',config_entry_id='generic-entry',device_id='generic-device',disabled_by=None)
+        hass.services=generic.Services(hass)
+        driver=importlib.import_module(module.__name__+'.entity_gate')
+        monkeypatch.setattr(driver,'_registry',lambda h:registry)
+        async def delay(seconds):pass
+        monkeypatch.setattr(driver,'_delay',delay)
+        await module.async_setup_entry(hass,entry)
+        manager=hass.data['cl_bb_manager']['manager'];admin=Connection();operator=Connection('selected-operator',False)
+        await call(handlers,'door_entities',hass,operator)
+        assert operator.errors and not hass.services.calls
+        await call(handlers,'add_entity_gate',hass,operator,name='Entrance',entity_id=entity,action=action,kind='shared',confirm=True)
+        assert operator.errors and not manager.data['gates']
+        await call(handlers,'door_entities',hass,admin)
+        assert any(e['entity_id']==entity for e in admin.result['entities'])
+        await call(handlers,'add_entity_gate',hass,admin,name='Entrance',entity_id=entity,action=action,kind='shared',confirm=True)
+        assert not admin.errors and not hass.services.calls
+        gate=manager.data['gates'][0]
+        await call(handlers,'arm_physical_gate',hass,admin,gate_id=gate['id'],confirm=True,confirm_wiring=True)
+        assert not admin.errors and not hass.services.calls
+        now=datetime.now(timezone.utc)
+        await call(handlers,'add_booking',hass,operator,room='A',guest_name='',start=(now-timedelta(minutes=1)).isoformat(),end=(now+timedelta(days=1)).isoformat(),gate_ids=[gate['id']])
+        assert not operator.errors
+        generated=operator.result['pin_once']
+        assert manager.data['bookings'][0]['physical_gate_ids']==[gate['id']]
+        app=web.Application();app['hass']=hass;view=views[0]
+        async def endpoint(request):return await (view.get if request.method=='GET' else view.post)(request,request.match_info['token'])
+        app.router.add_route('GET',view.url,endpoint);app.router.add_route('POST',view.url,endpoint)
+        path='/api/cl_bb_manager/physical/'+gate['physical_token']
+        async with TestClient(TestServer(app)) as client:
+            headers={'Host':'newhotel.example.org','Origin':'https://newhotel.example.org','Sec-Fetch-Site':'same-origin'}
+            response=await client.get(path,headers=headers);assert response.status==200
+            nonce=FormParser(await response.text()).nonce
+            response=await client.post(path,data={'pin':generated,'form_csrf':nonce},headers=headers)
+            assert response.status==200
+            assert [service for domain,service,data in hass.services.calls]==expected
+            assert all(data=={'entity_id':entity} for domain,service,data in hass.services.calls)
+            replay=await client.post(path,data={'pin':generated,'form_csrf':nonce},headers=headers)
+            assert replay.status==403 and len(hass.services.calls)==len(expected)
+    asyncio.run(run())

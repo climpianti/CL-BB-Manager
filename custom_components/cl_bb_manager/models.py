@@ -13,6 +13,9 @@ ALLOWED_ACTIONS = {
     "script.turn_on": "script",
     "button.press": "button",
     "lock.unlock": "lock",
+    "lock.open": "lock",
+    "cover.open_cover": "cover",
+    "input_button.press": "input_button",
     "switch.turn_on": "switch",
 }
 

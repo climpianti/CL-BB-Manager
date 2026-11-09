@@ -67,7 +67,7 @@ def register_commands(hass):
         "type": "cl_bb_manager/add_gate",
         vol.Required("name"): str,
         vol.Required("entity_id"): str,
-        vol.Required("action"): vol.In(["script.turn_on", "button.press", "lock.unlock", "switch.turn_on"]),
+        vol.Required("action"): vol.In(["script.turn_on", "button.press", "lock.unlock", "lock.open", "switch.turn_on", "cover.open_cover", "input_button.press"]),
         vol.Required("kind"): vol.In(["shared", "private"]),
     })
     @websocket_api.async_response
@@ -97,7 +97,7 @@ def register_commands(hass):
         vol.Required("gate_id"): str,
         vol.Required("name"): str,
         vol.Required("entity_id"): str,
-        vol.Required("action"): vol.In(["script.turn_on", "button.press", "lock.unlock", "switch.turn_on"]),
+        vol.Required("action"): vol.In(["script.turn_on", "button.press", "lock.unlock", "lock.open", "switch.turn_on", "cover.open_cover", "input_button.press"]),
         vol.Required("kind"): vol.In(["shared", "private"]),
         vol.Required("enabled"): bool,
     })
@@ -124,7 +124,7 @@ def register_commands(hass):
                     original[key] != candidate[key]
                     for key in ("entity_id", "action", "kind")
                 )
-                if "shelly_binding" in original:
+                if "shelly_binding" in original or "entity_binding" in original:
                     sensitive_change = native_mapping_changed(hass, original, candidate)
                 if sensitive_change:
                     # Keep active/future bookings bound to the same gate mapping.
@@ -216,7 +216,7 @@ def register_commands(hass):
                 booking["physical_gate_ids"] = [
                     gate["id"] for gate in manager.data["gates"]
                     if gate["id"] in selected and gate.get("physical_token")
-                    and (gate.get("shelly_binding") or gate.get("hardware_candidate"))
+                    and (gate.get("shelly_binding") or gate.get("entity_binding") or gate.get("hardware_candidate"))
                 ]
                 manager.data["bookings"].append(booking)
                 manager.audit("booking_added", booking["room"])

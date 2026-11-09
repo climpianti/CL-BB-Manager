@@ -114,7 +114,7 @@ class BBManager:
             )
             item["physical_qr_prepared"] = bool(gate.get("physical_token"))
             item["physical_enabled"] = gate.get("physical_enabled") is True
-            item["provider"] = "shelly" if gate.get("shelly_binding") else "existing"
+            item["provider"] = "shelly" if gate.get("shelly_binding") else "home_assistant" if gate.get("entity_binding") else "existing"
             if is_admin:
                 item.update({
                     key: gate[key] for key in ("entity_id", "action")
@@ -129,6 +129,15 @@ class BBManager:
                         item["entity_id"] = resolve_binding(self.hass, gate["shelly_binding"]).entity_id
                     except ValueError:
                         pass
+                if gate.get("entity_binding"):
+                    from .entity_gate import resolve_binding
+                    try:
+                        item["entity_id"] = resolve_binding(self.hass, gate["entity_binding"])
+                    except ValueError:
+                        pass
+                    item["pulse_seconds"] = gate["entity_binding"].get("pulse_seconds")
+                    item["switch_mode"] = gate["entity_binding"].get("switch_mode")
+                    item["recovery_pending"] = gate["id"] in self.data.get("pending_entity_pulses", {})
             gates.append(item)
         return {
             "structure": self.entry.data.get("structure_name", "B&B"),
@@ -154,6 +163,11 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     manager = BBManager(hass, entry)
     await manager.async_load()
     domain_data["manager"] = manager
+    # Recover interrupted generic relay pulses using OFF only. Unavailable or
+    # replaced devices keep a pending marker and cannot receive a fresh ON.
+    from .entity_gate import async_recover_on_lifecycle
+    async with manager.lock:
+        await async_recover_on_lifecycle(manager)
 
     if not domain_data.get("routes_registered"):
         await hass.http.async_register_static_paths([
@@ -186,6 +200,10 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
     """Unload only the panel, retaining routes for safe reload in this process."""
     frontend.async_remove_panel(hass, PANEL_PATH, warn_if_unknown=False)
-    hass.data.get(DOMAIN, {}).pop("manager", None)
+    manager = hass.data.get(DOMAIN, {}).pop("manager", None)
+    if manager is not None:
+        async with manager.lock:
+            from .entity_gate import async_recover_on_lifecycle
+            await async_recover_on_lifecycle(manager)
     return True
 

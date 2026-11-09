@@ -152,7 +152,10 @@ class PhysicalGuestView(HomeAssistantView):
                         and approved_booking(matched, gate["id"], manager.property_id)
                         and physical_target(manager, gate, hass, token=token) is not None
                     )
-                if "shelly_binding" in gate:
+                if "entity_binding" in gate:
+                    from .entity_gate import async_command
+                    await async_command(manager, gate, before_command=still_authorized)
+                elif "shelly_binding" in gate:
                     from .shelly_gate import async_pulse
                     await async_pulse(hass, gate["shelly_binding"], before_command=still_authorized)
                 else:

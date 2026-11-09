@@ -12,9 +12,15 @@ from .models import as_utc
 
 def native_mapping_changed(hass, original: dict, candidate: dict) -> bool:
     """Accept a registry rename only when the stored native identity matches."""
-    from .shelly_gate import resolve_binding
-    relay = resolve_binding(hass, original["shelly_binding"])
-    if candidate["entity_id"] != relay.entity_id or candidate["action"] != "switch.turn_on":
+    if "entity_binding" in original:
+        from .entity_gate import resolve_binding
+        entity_id = resolve_binding(hass, original["entity_binding"])
+        action = original["entity_binding"]["action"]
+    else:
+        from .shelly_gate import resolve_binding
+        entity_id = resolve_binding(hass, original["shelly_binding"]).entity_id
+        action = "switch.turn_on"
+    if candidate["entity_id"] != entity_id or candidate["action"] != action:
         raise ValueError("Il dispositivo configurato richiede una nuova procedura di associazione.")
     return original["kind"] != candidate["kind"]
 

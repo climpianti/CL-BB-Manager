@@ -1,9 +1,9 @@
 class ClBbManagerPanel extends HTMLElement {
- constructor(){super();this.attachShadow({mode:"open"});this.loaded=false;this.tab="dashboard";this.data=null;this.error="";this.pin="";this.qr=null;this.selectedGate=null;this.relays=null;this.busy=false;this.requestId=0;this.userId=null;this.connection=null;this.generation=0;this.operationId=0;}
+ constructor(){super();this.attachShadow({mode:"open"});this.loaded=false;this.tab="dashboard";this.data=null;this.error="";this.pin="";this.qr=null;this.selectedGate=null;this.relays=null;this.entities=null;this.busy=false;this.requestId=0;this.userId=null;this.connection=null;this.generation=0;this.operationId=0;}
  set hass(h){
   const userId=h?.user?.id||null, connection=h?.connection;
   if(this.userId!==userId || (this.connection && this.connection!==connection)){
-   this.loaded=false;this.data=null;this.pin="";this.qr=null;this.relays=null;this.tab="dashboard";this.requestId++;this.generation++;this.operationId++;this.busy=false;
+   this.loaded=false;this.data=null;this.pin="";this.qr=null;this.relays=null;this.entities=null;this.tab="dashboard";this.requestId++;this.generation++;this.operationId++;this.busy=false;
   }
   this.userId=userId;this.connection=connection;this._hass=h;
   if(!this.loaded && typeof h?.callWS==="function"){this.loaded=true;this.load();}
@@ -21,9 +21,9 @@ class ClBbManagerPanel extends HTMLElement {
  go(tab){this.tab=tab;this.pin="";this.qr=null;this.render();}
  armed(gate){return gate.physical_enabled && this.data.hardware_control==="enabled";}
  render(){
-  const root=this.shadowRoot;root.replaceChildren();const style=this.node("style");style.textContent="@import url('/cl_bb_manager_static/bluetech-glass.css?v=0.6.0-beta.1');";root.append(style);
+  const root=this.shadowRoot;root.replaceChildren();const style=this.node("style");style.textContent="@import url('/cl_bb_manager_static/bluetech-glass.css?v=0.6.0-beta.2');";root.append(style);
   const page=this.node("main","","page"),hero=this.node("header","","hero");root.append(page);
-  const brand=this.node("div","","hero-brand"),logo=this.node("img");logo.src="/cl_bb_manager_static/cl-impianti-logo.svg?v=0.6.0-beta.1";logo.alt="CL Impianti";logo.className="brand-logo";brand.append(logo);
+  const brand=this.node("div","","hero-brand"),logo=this.node("img");logo.src="/cl_bb_manager_static/cl-impianti-logo.svg?v=0.6.0-beta.2";logo.alt="CL Impianti";logo.className="brand-logo";brand.append(logo);
   const word=this.node("span","","brand-word");word.append(this.node("strong","CL B&B MANAGER"),this.node("small","Gestione struttura e accessi"));brand.append(word);
   hero.append(brand,this.node("h1",this.data?.structure||"CL B&B Manager"),this.node("p","Prenotazioni, codici personali e accessi alla struttura","subtitle"));page.append(hero);
   if(this.error){const note=this.node("div",this.error,"notice");note.setAttribute("role","alert");page.append(note);}
@@ -84,6 +84,7 @@ class ClBbManagerPanel extends HTMLElement {
  gates(grid){
   const list=this.card("Varchi della struttura");for(const gate of this.data.gates){
    const row=this.node("div","","item");row.append(this.node("strong",gate.name),this.node("p",(gate.kind==="shared"?"Accesso comune":"Accesso privato")+" · "+(this.armed(gate)?"Attivo":"Inattivo"),"small"));
+   if(gate.recovery_pending)row.append(this.node("p","Spegnimento da verificare: nuove aperture bloccate.","notice"),this.button("Ripristina impulso interrotto",()=>{if(confirm("Inviare soltanto OFF al relè del precedente impulso e verificare il ripristino?"))this.act("recover_entity_gate",{gate_id:gate.id,confirm:true});}));
    if(gate.pulse_seconds)row.append(this.node("p","Impulso: "+gate.pulse_seconds+" s","small"));
    row.append(this.button("Modifica nome / tipo",()=>this.edit(gate,grid)));
    if(gate.physical_qr_prepared){row.append(this.button("QR della porta",()=>{this.selectedGate=gate.id;this.go("accessi");}));row.append(this.button(this.armed(gate)?"Disattiva accesso":"Abilita accesso",()=>{
@@ -97,7 +98,35 @@ class ClBbManagerPanel extends HTMLElement {
   setup.append(this.button("Cerca dispositivi",async()=>{const generation=this.generation;try{const result=await this.api("shelly_relays");if(generation!==this.generation)return;this.relays=result.relays;this.error="";}catch(e){if(generation!==this.generation)return;this.error=this.describeError(e);}this.render();}));
   if(this.relays?.length){const form=this.node("form");this.field(form,"Nome varco","name");this.select(form,"Shelly / uscita","entity_id",this.relays.map(r=>[r.entity_id,r.name+" · "+r.model]),this.relays[0].entity_id);const duration=this.field(form,"Durata impulso (secondi)","pulse_seconds","number",2);duration.min=.5;duration.max=5;duration.step=.5;this.select(form,"Tipo","kind",[["private","Privato"],["shared","Comune"]],"private");const save=this.node("button","Configura e prepara QR");save.type="submit";save.disabled=this.busy;form.append(save);form.onsubmit=e=>{e.preventDefault();if(!form.reportValidity())return;if(!confirm("Applicare al relè selezionato il profilo apriporta? Avvio spento, accensione automatica disabilitata e spegnimento automatico dopo l'impulso. Il varco resterà inattivo."))return;const values=Object.fromEntries(new FormData(form));this.act("add_shelly_gate",{...values,pulse_seconds:Number(values.pulse_seconds),confirm:true});};setup.append(form);}
   else if(this.relays)setup.append(this.node("p","Nessun dispositivo compatibile pronto. Aggiungi lo Shelly in Home Assistant, controlla che sia online e con uscita OFF, poi ripeti la ricerca.","notice"));grid.append(setup);
+  this.entitySetup(grid);
   const emergency=this.card("Blocco accessi");emergency.append(this.node("p","Il blocco di emergenza revoca tutti i QR e i relativi permessi. I QR stampati dovranno essere sostituiti."),this.button("Blocca e revoca tutti i QR",()=>{if(confirm("Revocare tutti i QR e tutti i permessi fisici della struttura?"))this.act("emergency_disable_physical",{confirm:true});}));grid.append(emergency);
+ }
+ entitySetup(grid){
+  const card=this.card("Aggiungi varco Home Assistant");
+  card.append(this.node("p","Collega una serratura, un relè di qualsiasi marca, un pulsante, uno script apriporta o un cancello già presente in Home Assistant. L'associazione prepara il QR e lascia il varco inattivo, senza comandare la porta."));
+  card.append(this.button("Cerca entità apriporta",async()=>{const generation=this.generation;try{const result=await this.api("door_entities");if(generation!==this.generation)return;this.entities=result.entities;this.error="";}catch(e){if(generation!==this.generation)return;this.error=this.describeError(e);}this.render();}));
+  if(this.entities?.length){
+   const form=this.node("form");this.field(form,"Nome varco","name");
+   const entity=this.select(form,"Entità Home Assistant","entity_id",this.entities.map(e=>[e.entity_id,e.name+" · "+e.entity_id]),this.entities[0].entity_id);
+   const details=this.node("div");form.append(details);
+   const update=()=>{details.replaceChildren();const current=this.entities.find(e=>e.entity_id===entity.value);if(!current)return;
+    this.select(details,"Comando della porta","action",current.actions.map(a=>[a.action,a.label]),current.actions[0].action);
+    if(entity.value.startsWith("lock."))details.append(this.node("p","Sblocca rende la serratura sbloccata; Apri scrocco aziona anche lo scrocco, se supportato. Il codice ospite non viene passato come codice dispositivo. La richiusura segue la configurazione della serratura.","small"));
+    if(entity.value.startsWith("switch.")){
+     this.select(details,"Gestione impulso","switch_mode",[["ha_pulse","Impulso gestito da Home Assistant"],["device_pulse","Timer locale già configurato nel dispositivo"]],"ha_pulse");
+     const seconds=this.field(details,"Durata impulso (secondi)","pulse_seconds","number",2);seconds.min=.5;seconds.max=5;seconds.step=.5;
+     details.append(this.node("p","Con impulso Home Assistant il componente invia ON e poi OFF. Se HA o la rete si interrompono, lo spegnimento può ritardare: è preferibile un timer locale. Il timer locale generico deve essere configurato e verificato sul dispositivo; non può essere impostato automaticamente per ogni marca.","small"));
+     const label=this.node("label","Confermo il timer locale del dispositivo (solo se scelto)"),cb=this.node("input");cb.type="checkbox";cb.name="confirm_device_pulse";label.append(cb);details.append(label);
+    }
+   };entity.addEventListener("change",update);update();
+   this.select(form,"Tipo","kind",[["private","Privato"],["shared","Comune"]],"private");const save=this.node("button","Associa entità e prepara QR");save.type="submit";save.disabled=this.busy;form.append(save);
+   form.onsubmit=e=>{e.preventDefault();if(!form.reportValidity())return;const values=Object.fromEntries(new FormData(form));const local=!!form.querySelector('[name="confirm_device_pulse"]')?.checked;
+    if(values.switch_mode==="device_pulse"&&!local){this.showValidation(form,"Conferma che il timer locale sia già configurato e verificato.");return;}
+    if(!confirm("Associare l'entità selezionata a questo varco? Verifica che il comando scelto sia quello previsto per la porta. Nessun comando viene inviato ora; il varco resterà inattivo."))return;
+    this.act("add_entity_gate",{name:values.name,entity_id:values.entity_id,action:values.action,kind:values.kind,switch_mode:values.switch_mode||"ha_pulse",pulse_seconds:Number(values.pulse_seconds||2),confirm_device_pulse:local,confirm:true});
+   };card.append(form);
+  }else if(this.entities)card.append(this.node("p","Nessuna entità apriporta disponibile e non ancora associata. Controlla l'integrazione del dispositivo in Home Assistant.","notice"));
+  grid.append(card);
  }
  edit(gate,grid){const card=this.card("Modifica "+gate.name),form=this.node("form");this.field(form,"Nome","name","text",gate.name);this.select(form,"Tipo","kind",[["private","Privato"],["shared","Comune"]],gate.kind);const submit=this.node("button","Salva modifiche");submit.type="submit";form.append(submit);form.onsubmit=e=>{e.preventDefault();this.act("update_gate",{...Object.fromEntries(new FormData(form)),gate_id:gate.id,entity_id:gate.entity_id,action:gate.action,enabled:gate.enabled});};card.append(form);grid.prepend(card);}
  settings(grid){
@@ -106,7 +135,7 @@ class ClBbManagerPanel extends HTMLElement {
  }
  events(grid){
   const history=this.card("Registro accessi");for(const entry of [...(this.data.access_history||[])].reverse()){const row=this.node("div","","item");row.append(this.node("strong",entry.gate_name||"Porta"),this.node("p",(entry.guest_name||entry.room||"Ospite")+" · "+new Date(entry.at).toLocaleString("it-IT"),"small"),this.node("p",entry.result==="authorized"?"Comando autorizzato":"Accesso negato","small"));history.append(row);}grid.append(history);
-  if(this.data.role!=="admin")return;const admin=this.card("Registro amministrativo");for(const event of [...(this.data.events||[])].reverse()){const row=this.node("div","","item");row.append(this.node("strong",({booking_added:"Prenotazione creata",booking_revoked:"Codice revocato",gate_updated:"Varco modificato",gate_removed:"Varco rimosso",shelly_gate_configured:"Shelly configurato",physical_gate_armed_permanent:"Accesso porta abilitato",physical_gate_disarmed:"Accesso porta disabilitato",physical_command_sent:"Comando di apertura inviato",physical_denied:"Accesso negato",physical_emergency_disabled:"Blocco di emergenza",physical_qr_prepared_dormant:"QR della porta predisposto"})[event.event]||"Operazione registrata"),this.node("p",new Date(event.at).toLocaleString("it-IT"),"small"));admin.append(row);}grid.append(admin);
+  if(this.data.role!=="admin")return;const admin=this.card("Registro amministrativo");for(const event of [...(this.data.events||[])].reverse()){const row=this.node("div","","item");row.append(this.node("strong",({booking_added:"Prenotazione creata",booking_revoked:"Codice revocato",gate_updated:"Varco modificato",gate_removed:"Varco rimosso",shelly_gate_configured:"Shelly configurato",entity_gate_configured:"Varco Home Assistant configurato",physical_gate_armed_permanent:"Accesso porta abilitato",physical_gate_disarmed:"Accesso porta disabilitato",physical_command_sent:"Comando di apertura inviato",physical_denied:"Accesso negato",physical_emergency_disabled:"Blocco di emergenza",physical_qr_prepared_dormant:"QR della porta predisposto"})[event.event]||"Operazione registrata"),this.node("p",new Date(event.at).toLocaleString("it-IT"),"small"));admin.append(row);}grid.append(admin);
  }
 }
 if(!customElements.get("cl-bb-manager-panel"))customElements.define("cl-bb-manager-panel",ClBbManagerPanel);

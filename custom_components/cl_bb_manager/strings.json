@@ -43,13 +43,9 @@
       },
       "add_gate": {
         "title": "Aggiungi varco",
-        "description": "Scegli un relè Shelly 1 Mini Gen3 già aggiunto a Home Assistant e la durata dell’impulso. La procedura configura e verifica lo spegnimento automatico, prepara il QR e lascia il varco inattivo. Nessun impulso viene inviato.",
-        "data": {
-          "name": "Nome del varco",
-          "entity_id": "Shelly / uscita",
-          "pulse_seconds": "Durata impulso (secondi)",
-          "kind": "Tipo di varco",
-          "confirm": "Confermo la configurazione del relè per un accesso ad impulso"
+        "menu_options": {
+          "add_entity_gate": "Entità Home Assistant (serratura, relè, pulsante, script, cancello)",
+          "add_shelly_gate": "Shelly con configurazione automatica"
         }
       },
       "remove_gate": {
@@ -82,12 +78,37 @@
           "action": "Azione",
           "kind": "Tipo di varco"
         }
+      },
+      "add_shelly_gate": {
+        "title": "Aggiungi varco",
+        "description": "Scegli un relè Shelly 1 Mini Gen3 già aggiunto a Home Assistant e la durata dell’impulso. La procedura configura e verifica lo spegnimento automatico, prepara il QR e lascia il varco inattivo. Nessun impulso viene inviato.",
+        "data": {
+          "name": "Nome del varco",
+          "entity_id": "Shelly / uscita",
+          "pulse_seconds": "Durata impulso (secondi)",
+          "kind": "Tipo di varco",
+          "confirm": "Confermo la configurazione del relè per un accesso ad impulso"
+        }
+      },
+      "add_entity_gate": {
+        "title": "Associa entità Home Assistant",
+        "description": "Seleziona entità e comando. Per le serrature distingui sblocco e apertura scrocco. Per i relè scegli impulso HA (dipende da HA/rete) oppure timer locale già verificato. Nessun comando viene inviato durante l’associazione; il varco resta inattivo. Il codice della prenotazione non viene inoltrato al dispositivo.",
+        "data": {
+          "name": "Nome varco",
+          "entity_id": "Entità apriporta",
+          "action": "Comando della porta",
+          "kind": "Tipo varco",
+          "switch_mode": "Gestione impulso (solo relè)",
+          "pulse_seconds": "Relè: durata impulso (secondi)",
+          "confirm_device_pulse": "Confermo il timer locale già configurato (solo device_pulse)",
+          "confirm": "Confermo entità e comando associati alla porta"
+        }
       }
     },
     "error": {
       "invalid_public_origin": "Indica un indirizzo HTTPS valido senza percorso o porta.",
       "invalid_operator_users": "Seleziona soltanto utenti Home Assistant attivi, non amministratori, fino a 20 operatori.",
-      "invalid_gate": "Configurazione non completata. Verifica il dispositivo selezionato, l’uscita OFF, il nome e la durata dell’impulso; conferma l’applicazione delle impostazioni.",
+      "invalid_gate": "Configurazione non completata. Verifica entità disponibile, comando supportato, nome e conferme. I relè devono essere OFF e gli script inattivi. Durata impulso: 0,5–5 secondi.",
       "gate_has_bookings": "Impossibile eliminare il varco: revoca prima le prenotazioni ancora valide che lo utilizzano."
     },
     "abort": {

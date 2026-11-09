@@ -191,14 +191,14 @@ def test_add_gate_is_disabled_and_duplicate_rejected():
             "name": "Cancello", "entity_id": "switch.another_hotel_entrance",
             "pulse_seconds": 2, "confirm": True, "kind": "shared",
         }
-        created = await flow.async_step_add_gate(gate_values)
+        created = await flow.async_step_add_shelly_gate(gate_values)
         assert created["type"] == "create_entry"
         assert created["data"]["operator_user_ids"] == ["worker-a"]
         assert manager.saves == 1
         assert len(manager.data["gates"]) == 1
         assert manager.data["gates"][0]["enabled"] is False
         assert manager.data["gates"][0]["property_id"] == manager.property_id
-        repeated = await flow.async_step_add_gate(gate_values)
+        repeated = await flow.async_step_add_shelly_gate(gate_values)
         assert repeated["type"] == "abort"
         assert repeated["reason"] == "no_shelly"
         assert len(manager.data["gates"]) == 1
@@ -208,7 +208,7 @@ def test_add_gate_is_disabled_and_duplicate_rejected():
 def test_gate_deletion_requires_confirmation_and_respects_bookings():
     async def go():
         flow, manager = setup()
-        await flow.async_step_add_gate({
+        await flow.async_step_add_shelly_gate({
             "name": "Cancello", "entity_id": "switch.another_hotel_entrance",
             "pulse_seconds": 2, "confirm": True, "kind": "shared",
         })
@@ -238,7 +238,7 @@ def test_gate_deletion_requires_confirmation_and_respects_bookings():
 def test_nonexistent_gate_not_removed():
     async def go():
         flow, manager = setup()
-        await flow.async_step_add_gate({
+        await flow.async_step_add_shelly_gate({
             "name": "Scala", "entity_id": "switch.another_hotel_entrance",
             "pulse_seconds": 2, "confirm": True, "kind": "shared",
         })
@@ -247,3 +247,22 @@ def test_nonexistent_gate_not_removed():
         assert len(manager.data["gates"]) == 1
     asyncio.run(go())
 
+
+
+def test_add_menu_and_generic_lock_options_without_device_commands(monkeypatch):
+    async def run():
+        import test_entity_gate as generic
+        flow,_=setup()
+        manager,hass,registry,_=generic.fixture(monkeypatch)
+        product=importlib.import_module(PACKAGE+'.entity_gate')
+        monkeypatch.setattr(product,'_registry',lambda h:registry)
+        flow.hass=hass
+        choice=await flow.async_step_add_gate()
+        assert choice['menu_options']==['add_entity_gate','add_shelly_gate']
+        form=await flow.async_step_add_entity_gate()
+        assert form['step_id']=='add_entity_gate'
+        result=await flow.async_step_add_entity_gate(dict(name='Yale',entity_id=generic.YALE,action='lock.unlock',kind='private',confirm=True))
+        assert result['type']=='create_entry' and len(manager.data['gates'])==1
+        assert manager.data['gates'][0]['action']=='lock.unlock'
+        assert not hass.services.calls
+    asyncio.run(run())

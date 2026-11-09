@@ -1,4 +1,4 @@
-# Verifica della trasformazione — 0.6.0-beta.1
+# Verifica della trasformazione — 0.6.0-beta.2
 
 Data: 9 novembre 2026. Base: `main` alpha.17, commit `478ef2860934ccf0c6e59b22faee15a82c6cdc99`.
 
@@ -39,12 +39,12 @@ La registrazione di un varco può scrivere le impostazioni Shelly dopo conferma 
 
 ## Risultati e limiti
 
-- Suite Python e regressioni HTTP: **262 test superati** (`python -m pytest tests -q`), inclusi i due percorsi compatibili Strada/Scala con attuatori fittizi.
-- Suite DOM JavaScript: **11 test superati** (`npm test`); verifica il DOM realmente costruito e gli eventi del pannello.
+- Suite Python e regressioni HTTP: **290 test superati** (`python -m pytest tests -q`), inclusi i due percorsi compatibili Strada/Scala con attuatori fittizi.
+- Suite DOM JavaScript: **13 test superati** (`npm test`); verifica il DOM realmente costruito e gli eventi del pannello.
 - Chromium 138 ha inoltre confermato il comportamento del form nativo: con `no-referrer` invia `Origin: null`; con `strict-origin` invia l’origine HTTPS corretta e un Referer privo del percorso/token.
 - Chromium 138, dati fittizi, richieste intercettate: 4 combinazioni ruolo/larghezza, 20 visite di schede; nessun errore JavaScript e nessuno scorrimento orizzontale.
 - Installazione, salvataggio, riavvio e apertura sono simulati con gli handler effettivi del componente. Non è stata avviata una nuova istanza HA completa né comandato hardware reale.
-- Supporto automatico limitato a Shelly 1 Mini Gen3 già aggiunto all'integrazione ufficiale, online e OFF; altri modelli vengono esclusi. Una struttura per istanza HA, fino a 200 varchi, massimo 20 operatori e soggiorni fino a 90 giorni.
+- La configurazione hardware automatica supporta Shelly 1 Mini Gen3 online/OFF. Il driver generico supporta entità HA di qualsiasi marca nei domini `lock`, `switch`, `button`, `input_button`, `script` e `cover`, secondo le azioni disponibili e le conferme dell’installatore. Una struttura per istanza HA, fino a 200 varchi, massimo 20 operatori e soggiorni fino a 90 giorni.
 
 Questa modifica è una versione candidata da revisionare, non una dichiarazione di collaudo hardware concluso. Il numero beta compare nel manifest e nella documentazione tecnica; non sostituisce le etichette operative dell'interfaccia con messaggi di prova.
 
@@ -53,8 +53,16 @@ Questa modifica è una versione candidata da revisionare, non una dichiarazione 
 1. Su un HA pulito aggiungere il modello Shelly supportato e installare la revisione esatta. Verificare configurazione, reload e assenza di script/helper richiesti.
 2. Con serratura disconnessa o banco prova, verificare prima/dopo le quattro impostazioni e l'uscita OFF durante la procedura. Controllare anche il comportamento elettrico dell'ingresso locale, lasciato invariato dal componente.
 3. Accedere con un amministratore e un operatore selezionato; controllare l'accesso del secondo senza privilegi di amministratore e il rifiuto delle funzioni di configurazione. Provare revoca e riabilitazione.
-4. Dopo autorizzazione esplicita al collaudo fisico, abilitare il varco, creare una prenotazione di prova e stampare il QR dalla sezione dedicata. Dal telefono, aprire il QR in HTTPS e inserire il codice della prenotazione. Verificare un solo impulso, la durata e il ritorno OFF anche se HA si interrompe.
+4. Dopo autorizzazione esplicita al collaudo fisico, abilitare il varco, creare una prenotazione di prova e stampare il QR dalla sezione dedicata. Dal telefono, aprire il QR in HTTPS e inserire il codice della prenotazione. Verificare un solo comando. Per i relè con timer locale verificare durata e ritorno OFF anche durante l’interruzione di HA; per l’impulso HA verificare durata in condizioni normali e recupero OFF al ripristino della connessione.
 5. Ripetere il flusso per due porte distinte e provare codice errato, scadenza, revoca e porta non autorizzata. Riavviare HA e verificare che il QR stampato resti valido con i soli permessi previsti.
 6. Prima della consegna reale verificare cablaggio, backup/ripristino e procedura operativa del gestore. Per Bausan non sostituire i QR esistenti e non cambiare armamento o prenotazioni come effetto dell'aggiornamento.
 
 Nessuna modifica di questa revisione è stata distribuita sul sistema reale durante lo sviluppo; non sono stati impartiti comandi di apertura, cambiati stati delle porte, token o autorizzazioni reali.
+
+## Estensione entità HA — beta.2
+
+`entity_gate.py` gestisce le azioni standard di serrature, relè, pulsanti, script e cancelli. L’amministratore associa un’entità e un’azione tipizzata: nessun servizio, codice dispositivo o target arbitrario viene accettato dalla pagina ospite. `lock.open` richiede la funzione OPEN dichiarata; `lock.unlock` non viene confuso con l’azionamento dello scrocco. La corrispondenza viene verificata di nuovo prima del comando. Se l’entità è registrata, l’identità di registro viene conservata per tollerare rinomine e rifiutare rimozioni/sostituzioni. Entità senza registro sono associate al loro entity ID: non possono seguire una rinomina automaticamente.
+
+Per i relè generici è disponibile l’impulso gestito da HA oppure il timer locale già configurato. Il primo non garantisce lo spegnimento durante un’interruzione di HA/rete: l’intento viene salvato prima dell’ON e il ripristino invia solo OFF. L’avvio/scaricamento ha un budget di 12 secondi per i ripristini; quelli non completati restano bloccati e recuperabili dall’amministratore. Non vengono ritentati automaticamente comandi di apertura. Il timer locale generico richiede conferma esplicita e non viene configurato via API universali inesistenti.
+
+I test aggiunti includono flusso WebSocket → prenotazione → GET/POST effettive per Yale simulata (`unlock`/`open`) e relè di altra marca, feature mancanti, codici hardware richiesti, servizi arbitrari rifiutati, identità sostituita, timeout, cancellazione, salvataggio fallito e recupero OFF persistente. Nessuna apertura reale è stata eseguita; l’entità Yale indicata dall’utente è usata come identificatore di fixture, non è stata comandata o interrogata sull’impianto.
