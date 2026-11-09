@@ -1,6 +1,6 @@
 # CL B&B Manager
 
-**Versione 0.5.0-alpha.8 — QR fisso stampabile HTTPS con PIN, soltanto per varchi virtuali, attivabile esplicitamente. Non per accessi reali in produzione.**
+**Versione 0.5.0-alpha.9 — QR fisso stampabile HTTPS in primo piano; QR temporaneo separato e marcato non stampabile. Solo varchi virtuali.**
 
 Integrazione custom per Home Assistant, progettata da CL Impianti per la gestione di varchi, camere e prenotazioni nei B&B.
 
@@ -105,3 +105,10 @@ Nelle **opzioni dell'integrazione** attiva esplicitamente **QR permanente solo v
 **Revoca QR:** con **Revoca QR e genera un nuovo codice** un amministratore può invalidare il QR stampato; sarà necessario sostituirlo sulla porta. Cambiare la mappatura del varco invalida automaticamente il QR precedente. Disabilitare il pilot rende il percorso non disponibile. I QR permanenti non sono monouso, ma i moduli web di verifica lo sono. Non utilizzare questa funzione su serrature o attuatori fisici: il server accetta soltanto i cinque script dimostrativi. Il portale legacy `/guest/` resta inattivo.
 
 **Stato:** implementazione virtuale sperimentale. Richiede test CI, collaudo HTTPS/reverse proxy da smartphone e revisione indipendente prima dell'esposizione a ospiti reali.
+
+
+### Quale QR stampare (alpha.9)
+
+Nella scheda **Accessi → Accesso da Internet** il riquadro **QR permanente stampabile · varchi virtuali** viene prima del riquadro **QR temporaneo · HTTPS · 10 minuti**. Il secondo continua a esistere solo per le prove a scadenza, e **non deve essere stampato**. Se il pannello permanente indica che è disabilitato, aprire **Impostazioni → Dispositivi e servizi → CL B&B Manager → Configura → Accesso HTTPS e operatori** e attivare la relativa opzione. Questa attivazione è **esplicita** e non viene abilitata automaticamente dall'aggiornamento.
+
+Se un QR temporaneo mostra `404 Not Found` dopo la scansione, verificare prima che non sia stato utilizzato o scaduto (10 minuti) e che si stia aprendo il dominio HTTPS configurato. Per i QR fissi il percorso è `/api/cl_bb_manager/permanent-demo/…`, diverso da `/api/cl_bb_manager/public-demo/…` usato dai QR monouso. Se un QR permanente presenta un 404, controllare l'opzione di abilitazione, il varco virtuale e il proxy HTTPS prima di dichiararlo funzionante. Non incollare il QR all'esterno su una porta fisica durante l'alpha.
