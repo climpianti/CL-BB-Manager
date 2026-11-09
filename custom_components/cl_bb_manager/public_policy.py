@@ -72,3 +72,26 @@ def valid_public_session(session: dict | None, host: str, configured_origin: str
         and session.get("host") == approved.removeprefix("https://")
         and host.lower() == session.get("host")
     )
+
+
+def valid_https_form_origin(
+    origin: str | None, fetch_site: str | None, expected_origin: str,
+) -> bool:
+    """Strict HTTPS POST origin policy, with mobile-browser no-Origin fallback.
+
+    Some browsers omit Origin for top-level form navigation. Such requests
+    remain protected by a separate server-issued, one-use CSRF token, and
+    are only accepted if browser-controlled Fetch Metadata is compatible.
+    An explicitly *different* Origin is never overridden by same-origin
+    Fetch Metadata, and cross-site submissions are always rejected.
+    """
+    try:
+        expected = validate_public_origin(expected_origin)
+    except ValueError:
+        return False
+    if fetch_site not in (None, "none", "same-origin"):
+        return False
+    if origin is None:
+        return True
+    # No cross-origin scheme fallback: HTTPS public origin must be exact.
+    return origin == expected
