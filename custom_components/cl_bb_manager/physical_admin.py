@@ -1,7 +1,7 @@
-"""Admin-only provisioning for future physical QR access.
+"""Admin-only persistent physical QR provisioning and emergency stop.
 
-This module intentionally cannot enable physical access. A separate reviewed
-release is required to lift the compile-time and per-site kill switches.
+Staging a QR never arms hardware. Site and gate arming require separate explicit
+administrator confirmation and can be disabled at any time.
 """
 from __future__ import annotations
 
@@ -113,14 +113,15 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
                 gate, booking = gates[0], bookings[0]
                 require_record_scope(gate, manager.property_id)
                 require_record_scope(booking, manager.property_id)
-                if gate.get("physical_token") is None or gate.get("physical_enabled") is True:
-                    raise ValueError("Preparare un QR fisico inattivo prima di concedere permessi.")
+                if gate.get("physical_token") is None:
+                    raise ValueError("Preparare prima un QR fisico per il varco.")
                 if booking.get("revoked") is True or gate["id"] not in booking.get("gate_ids", []):
                     raise ValueError("Prenotazione revocata o non autorizzata per il varco.")
-                from .models import booking_allows
-                # Permissions must not be granted to a past/future booking outside its window.
-                if not booking_allows(booking, gate["id"]):
-                    raise ValueError("Prenotazione non attiva: grant non consentito.")
+                from datetime import datetime, timezone
+                from .models import as_utc
+                # Future bookings can be pre-authorized, but never expired ones.
+                if as_utc(booking["end"]) <= datetime.now(timezone.utc):
+                    raise ValueError("Prenotazione già terminata.")
                 granted = booking.get("physical_gate_ids", [])
                 if not isinstance(granted, list):
                     raise ValueError("Autorizzazioni fisiche non valide.")
@@ -128,7 +129,7 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
                 manager.audit("physical_booking_grant_staged", booking["id"])
                 await manager.async_save()
             connection.send_result(msg["id"], {
-                "granted": True, "armed": False, "release_enabled": PHYSICAL_RELEASE_ENABLED,
+                "granted": True, "armed": bool(manager.data.get("physical_access_enabled") and gate.get("physical_enabled")), "release_enabled": PHYSICAL_RELEASE_ENABLED,
                 "booking_id": msg["booking_id"], "gate_id": msg["gate_id"],
             })
         except (ValueError, TypeError, KeyError) as err:
@@ -164,6 +165,90 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
             send_error(connection, msg, err)
 
     @websocket_api.websocket_command({
+        "type": "cl_bb_manager/arm_physical_gate",
+        vol.Required("gate_id"): str,
+        vol.Required("confirm"): vol.Equal(True),
+    })
+    @websocket_api.async_response
+    async def arm_physical_gate(hass, connection, msg):
+        """Persistent arming: no expiration. PIN and booking checks remain per use."""
+        manager = authorize(hass, connection, msg, admin_only=True)
+        if manager is None:
+            return
+        try:
+            from .physical_policy import physical_target
+            async with manager.lock:
+                gates = [g for g in manager.data["gates"] if g.get("id") == msg["gate_id"]]
+                if len(gates) != 1:
+                    raise ValueError("Varco non trovato.")
+                gate = gates[0]
+                require_record_scope(gate, manager.property_id)
+                if not PHYSICAL_RELEASE_ENABLED:
+                    raise ValueError("La release non consente l'accesso fisico.")
+                if not isinstance(gate.get("physical_token"), str):
+                    raise ValueError("Preparare il nuovo QR fisico prima dell'attivazione.")
+                # Recheck the exact approved script, script state and Shelly relay.
+                from .physical_policy import PILOT_SCRIPT_RELAY
+                candidate = read_candidate(gate)
+                if (
+                    gate.get("enabled") is not True
+                    or candidate is None
+                    or candidate["entity_id"] not in PILOT_SCRIPT_RELAY
+                ):
+                    raise ValueError("Varco o script non approvato.")
+                script = hass.states.get(candidate["entity_id"])
+                relay = hass.states.get(PILOT_SCRIPT_RELAY[candidate["entity_id"]])
+                if (
+                    script is None or script.state != "off"
+                    or relay is None or relay.state != "off"
+                ):
+                    raise ValueError("Script o relè non pronto.")
+                # Require at least one deliberately authorized, eligible booking.
+                from .physical_policy import approved_booking
+                if not any(
+                    approved_booking(booking, gate["id"], manager.property_id)
+                    for booking in manager.data["bookings"]
+                ):
+                    raise ValueError("Manca una prenotazione attiva con permesso fisico esplicito.")
+                manager.data["physical_access_enabled"] = True
+                gate["physical_enabled"] = True
+                manager.audit("physical_gate_armed_permanent", gate["id"])
+                await manager.async_save()
+            connection.send_result(msg["id"], {
+                "armed": True, "gate_id": msg["gate_id"],
+                "persistent": True,
+                "message": "QR fisico attivo senza scadenza; PIN e prenotazione rimangono obbligatori.",
+            })
+        except (ValueError, TypeError, KeyError) as err:
+            send_error(connection, msg, err)
+
+    @websocket_api.websocket_command({
+        "type": "cl_bb_manager/disarm_physical_gate",
+        vol.Required("gate_id"): str,
+        vol.Required("confirm"): vol.Equal(True),
+    })
+    @websocket_api.async_response
+    async def disarm_physical_gate(hass, connection, msg):
+        """Disable one physical gate without rotating a printed QR."""
+        manager = authorize(hass, connection, msg, admin_only=True)
+        if manager is None:
+            return
+        try:
+            async with manager.lock:
+                gates = [g for g in manager.data["gates"] if g.get("id") == msg["gate_id"]]
+                if len(gates) != 1:
+                    raise ValueError("Varco non disponibile.")
+                gate = gates[0]
+                require_record_scope(gate, manager.property_id)
+                gate["physical_enabled"] = False
+                manager.physical_forms.clear()
+                manager.audit("physical_gate_disarmed", gate["id"])
+                await manager.async_save()
+            connection.send_result(msg["id"], {"disarmed": True, "gate_id": msg["gate_id"]})
+        except (ValueError, TypeError) as err:
+            send_error(connection, msg, err)
+
+    @websocket_api.websocket_command({
         "type": "cl_bb_manager/emergency_disable_physical",
         vol.Required("confirm"): vol.Equal(True),
     })
@@ -190,6 +275,8 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
         prepare_physical_qr,
         grant_physical_booking,
         revoke_physical_booking,
+        arm_physical_gate,
+        disarm_physical_gate,
         emergency_disable_physical,
     ):
         websocket_api.async_register_command(hass, handler)
