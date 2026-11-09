@@ -662,6 +662,9 @@ def register_commands(hass):
         except (ValueError, TypeError) as err:
             _error(connection, msg, err)
 
+    from .physical_admin import register_physical_admin_commands
+    register_physical_admin_commands(hass, _authorize, _summary, _error)
+
     for handler in (
         get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin, demo_qr, public_pilot_qr, permanent_pilot_qr, rotate_permanent_qr, stage_hardware_gate, clear_hardware_gate, hardware_preflight_report
     ):
