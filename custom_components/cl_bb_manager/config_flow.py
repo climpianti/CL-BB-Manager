@@ -78,9 +78,10 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
             ):
                 errors["base"] = "invalid_operator_users"
             enabled = bool(user_input.get("public_pilot_enabled", False))
+            permanent_enabled = bool(user_input.get("permanent_pilot_enabled", False))
             origin = str(user_input.get("public_pilot_origin", "")).strip()
             origin = self.hass.config.external_url or origin
-            if enabled:
+            if enabled or permanent_enabled:
                 try:
                     origin = validate_public_origin(origin)
                 except ValueError:
@@ -89,12 +90,17 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
                 updated = self._unchanged_options()
                 updated.update({
                     "public_pilot_enabled": enabled,
-                    "public_pilot_origin": origin if enabled else "",
+                    "permanent_pilot_enabled": permanent_enabled,
+                    "public_pilot_origin": origin if (enabled or permanent_enabled) else "",
                     OPTION_OPERATOR_USERS: selected,
                 })
                 return self.async_create_entry(title="", data=updated)
 
         schema = vol.Schema({
+            vol.Required(
+                "permanent_pilot_enabled",
+                default=self.config_entry.options.get("permanent_pilot_enabled", False),
+            ): bool,
             vol.Required(
                 "public_pilot_enabled",
                 default=self.config_entry.options.get("public_pilot_enabled", False),
@@ -283,6 +289,7 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
                         current["token"] = candidate["token"]
                         manager.demo_sessions.clear()
                         manager.public_demo_sessions.clear()
+                        manager.permanent_forms.clear()
                     manager.audit("gate_updated", current["name"])
                     await manager.async_save()
             except (KeyError, TypeError, ValueError) as err:
