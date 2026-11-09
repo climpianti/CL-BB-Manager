@@ -81,6 +81,8 @@ flow_module = sys.modules[PACKAGE + ".config_flow"]
 
 
 class Store:
+    property_id = "2bb950a2-a1c5-46ca-b192-9ad03b1f8ca5"
+
     def __init__(self):
         self.data = {"gates": [], "bookings": [], "events": []}
         self.lock = asyncio.Lock()
@@ -182,6 +184,7 @@ def test_add_gate_is_disabled_and_duplicate_rejected():
         assert manager.saves == 1
         assert len(manager.data["gates"]) == 1
         assert manager.data["gates"][0]["enabled"] is False
+        assert manager.data["gates"][0]["property_id"] == manager.property_id
         repeated = await flow.async_step_add_gate(gate_values)
         assert repeated["type"] == "form"
         assert repeated["errors"]["base"] == "invalid_gate"
