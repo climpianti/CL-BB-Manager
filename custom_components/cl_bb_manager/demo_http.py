@@ -1,7 +1,7 @@
-"""Temporary LAN-only PIN + QR portal for virtual gate demonstrations.
+"""Shared guest-page rendering and the retired LAN-only test handler.
 
-No general guest portal is enabled. This route requires a 32-byte random
-temporary session created by an authenticated HA administrator.
+The physical portal reuses the rendering helpers. DemoPortalView is not
+registered by the integration and cannot command production doors.
 """
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 
 from .const import DOMAIN
+from .guest_i18n import text as guest_text
 from .access_history import add_access_event
 from .demo_policy import is_lan_peer, valid_demo_session, valid_form_origin
 from .guest import DEMO_SCRIPTS
@@ -23,39 +24,46 @@ from .security import candidate_bookings, charge_attempt, demo_target_allowed
 _LOGGER = logging.getLogger(__name__)
 
 
-def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf: str = "", complete: bool = False, physical: bool = False) -> web.Response:
+def _response(
+    gate_name: str, message: str = "", status: int = 200, *,
+    form_csrf: str = "", complete: bool = False, physical: bool = False,
+    language: str = "it", message_key: str | None = None,
+) -> web.Response:
     """CL Control BlueTech Glass access screen; all dynamic text is HTML-escaped."""
     name = escape(gate_name, quote=True)
-    info = escape(message, quote=True)
+    language = language if language in ("it", "en") else "it"
+    def translated(key):
+        return escape(guest_text(language, key), quote=True)
+    info = translated(message_key) if message_key else escape(message, quote=True)
     if complete:
         form_html = (
             "<div class='result' role='status' aria-live='polite'>"
             "<span class='result-icon' aria-hidden='true'>✓</span>"
-            "<strong>Richiesta completata</strong>"
-            + "<p>Richiesta elaborata correttamente.</p></div>"
+            f"<strong>{translated('success_title')}</strong>"
+            + f"<p>{translated('success_body')}</p></div>"
         )
     elif form_csrf:
         form_html = (
             "<form method='post' autocomplete='off'>"
             f"<input type='hidden' name='form_csrf' value='{escape(form_csrf, quote=True)}'>"
-            "<label for='pin'>Codice di accesso</label>"
+            f"<label for='pin'>{translated('code_label')}</label>"
             "<input id='pin' name='pin' type='password' inputmode='numeric'"
             " minlength='8' maxlength='8' pattern='[0-9]{8}'"
             " autocomplete='off' placeholder='••••••••' required>"
-            "<button type='submit'>Continua <span aria-hidden='true'>→</span></button>"
+            f"<button type='submit'>{translated('continue')} <span aria-hidden='true'>→</span></button>"
             "</form>"
         )
     else:
         # A consumed/expired nonce cannot be reused. An ordinary link performs
         # a fresh GET on the same QR URL without replaying the previous POST.
-        form_html = "<a class='retry' href=''>Riapri la pagina PIN</a>"
+        form_html = f"<a class='retry' href=''>{translated('retry')}</a>"
     document = (
-        "<!doctype html><html lang='it'><head><meta charset='utf-8'>"
+        f"<!doctype html><html lang='{language}'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         "<meta name='robots' content='noindex,nofollow'>"
         "<meta name='referrer' content='strict-origin'>"
         "<meta name='theme-color' content='#061324'>"
-        "<title>CL B&B Manager · Accesso</title>"
+        f"<title>{translated('title')}</title>"
         "<style>"
         "*{box-sizing:border-box}"
         ":root{color-scheme:dark;font-family:Inter,'Segoe UI',system-ui,-apple-system,sans-serif}"
@@ -105,14 +113,14 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         "@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}"
         "</style></head><body>"
         "<div class='wrap'><main>"
-        "<div class='brand'><img class='brand-logo' src='/cl_bb_manager_static/cl-impianti-logo.svg?v=0.6.0-beta.2' alt='CL Impianti'><span class='brand-copy'>"
-        "<strong>CL B&amp;B MANAGER</strong><small>ACCESSO OSPITI</small></span></div>"
-        "<p class='eyebrow'>Accesso alla struttura</p>"
+        "<div class='brand'><img class='brand-logo' src='/cl_bb_manager_static/cl-impianti-logo.svg?v=0.6.0-beta.3' alt='CL Impianti'><span class='brand-copy'>"
+        f"<strong>CL B&amp;B MANAGER</strong><small>{translated('brand_subtitle')}</small></span></div>"
+        f"<p class='eyebrow'>{translated('eyebrow')}</p>"
         f"<h1>{name}</h1><p class='description'>{info}</p>"
         f"{form_html}"
         "<div class='security'><span class='dot' aria-hidden='true'></span>"
-        "Codice personale · Connessione protetta</div>"
-        + "</main><p class='disclaimer'>L'invio del comando non conferma lo sblocco della serratura.</p>"
+        f"{translated('security')}</div>"
+        + f"</main><p class='disclaimer'>{translated('help')}</p>"
         + "</div></body></html>"
     )
     return web.Response(
@@ -120,6 +128,8 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         headers={
             "Cache-Control": "no-store",
             "Pragma": "no-cache",
+            "Content-Language": language,
+            "Vary": "Accept-Language",
             "X-Content-Type-Options": "nosniff",
             # no-referrer makes native form POSTs send Origin: null, which the
             # HTTPS origin guard correctly rejects. Send only the origin:
@@ -134,7 +144,7 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
 
 
 def _security_rejection(gate_name: str, *, route: str, reason: str,
-                        physical: bool = False) -> web.Response:
+                        physical: bool = False, language: str = "it") -> web.Response:
     """Explain a failed guard without logging PINs, nonces, URLs or headers.
 
     route and reason are fixed server-side categories, never request values.
@@ -146,7 +156,8 @@ def _security_rejection(gate_name: str, *, route: str, reason: str,
         if reason == "origin"
         else "Sessione scaduta o già utilizzata. Riapri la pagina PIN."
     )
-    return _response(gate_name, message, 403, physical=physical)
+    return _response(gate_name, message, 403, physical=physical, language=language,
+                     message_key=("origin" if reason == "origin" else "session") if physical else None)
 
 
 def _session_and_gate(request, token: str):

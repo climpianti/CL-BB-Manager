@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import secrets
+from functools import wraps
 
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 
 from .const import DOMAIN
+from .guest_i18n import browser_language, text as guest_text
 from .access_history import add_access_event
 from .demo_http import _response, _security_rejection
 from .models import pin_matches
@@ -49,6 +51,24 @@ def _context(request, token: str):
     return hass, manager, origin, matches[0]
 
 
+def _localized_errors(handler):
+    """Localise expected HTTP errors while retaining exception type and status."""
+    @wraps(handler)
+    async def wrapped(self, request, token):
+        try:
+            return await handler(self, request, token)
+        except (web.HTTPBadRequest, web.HTTPNotFound, web.HTTPServiceUnavailable) as exc:
+            language = browser_language(request.headers.get("Accept-Language"))
+            key = {400: "bad_request", 404: "not_found", 503: "unavailable"}[exc.status]
+            response = _response(guest_text(language, "generic_gate"), status=exc.status,
+                                 physical=True, language=language, message_key=key)
+            exc.text = response.text
+            exc.headers.update(response.headers)
+            exc.headers.pop("Content-Length", None)
+            raise
+    return wrapped
+
+
 class PhysicalGuestView(HomeAssistantView):
     """Guest endpoint; no HA user credentials are accepted as a booking PIN."""
 
@@ -56,7 +76,9 @@ class PhysicalGuestView(HomeAssistantView):
     name = "api:cl_bb_manager:physical"
     requires_auth = False
 
+    @_localized_errors
     async def get(self, request, token):
+        language = browser_language(request.headers.get("Accept-Language"))
         _, manager, _, gate = _context(request, token)
         async with manager.lock:
             if physical_target(manager, gate, manager.hass, token=token) is None:
@@ -66,11 +88,13 @@ class PhysicalGuestView(HomeAssistantView):
             except ValueError as exc:
                 raise web.HTTPServiceUnavailable() from exc
         return _response(
-            gate["name"], "Inserisci il PIN della prenotazione autorizzata.",
+            gate["name"], message_key="prompt", language=language,
             form_csrf=csrf, physical=True,
         )
 
+    @_localized_errors
     async def post(self, request, token):
+        language = browser_language(request.headers.get("Accept-Language"))
         hass, manager, origin, gate = _context(request, token)
         if (
             request.content_length is None
@@ -89,14 +113,14 @@ class PhysicalGuestView(HomeAssistantView):
             request.headers.get("Sec-Fetch-Site"), origin,
         ):
             return _security_rejection(
-                gate["name"], route="physical", reason="origin", physical=True,
+                gate["name"], route="physical", reason="origin", physical=True, language=language,
             )
 
         async with manager.lock:
             # Verify the same gate, token, authorization and script at call time.
             if not consume_form(manager.physical_forms, csrf, gate["id"]):
                 return _security_rejection(
-                    gate["name"], route="physical", reason="csrf", physical=True,
+                    gate["name"], route="physical", reason="csrf", physical=True, language=language,
                 )
             script_id = physical_target(manager, gate, hass, token=token)
             if script_id is None:
@@ -109,7 +133,7 @@ class PhysicalGuestView(HomeAssistantView):
             except (ValueError, TypeError) as exc:
                 raise web.HTTPServiceUnavailable() from exc
             if not permitted:
-                return _response(gate["name"], "Troppi tentativi. Riprova più tardi.", 429, physical=True)
+                return _response(gate["name"], status=429, physical=True, language=language, message_key="too_many")
 
             matched = None
             if len(pin) == 8 and pin.isascii() and pin.isdecimal():
@@ -131,10 +155,10 @@ class PhysicalGuestView(HomeAssistantView):
                 manager.audit("physical_denied", gate["id"])
                 add_access_event(manager.data, source="https", result="denied", gate=gate)
                 await manager.async_save()
-                return _response(gate["name"], "Codice non valido o non autorizzato.", 403, physical=True)
+                return _response(gate["name"], status=403, physical=True, language=language, message_key="invalid_code")
 
             if not take_cooldown(manager.data, gate["id"]):
-                return _response(gate["name"], "Attendere prima di riprovare.", 429, physical=True)
+                return _response(gate["name"], status=429, physical=True, language=language, message_key="cooldown")
             # Persist the safety reservation before any potentially uncertain
             # switch operation. No retry on timeout.
             manager.audit("physical_attempt", gate["id"])
@@ -177,7 +201,7 @@ class PhysicalGuestView(HomeAssistantView):
         # HA service completion does not prove that an actual door unlocked.
         return _response(
             gate["name"],
-            "Comando inviato. Verifica l'apertura della porta.",
+            message_key="success", language=language,
             complete=True, physical=True,
         )
 

@@ -2,7 +2,7 @@
 
 Integrazione Home Assistant di CL Impianti per gestire prenotazioni, codici personali e QR permanenti delle porte. Un amministratore configura la struttura e i varchi; gli operatori espressamente abilitati gestiscono gli ospiti senza diventare amministratori di Home Assistant.
 
-**Versione in revisione: 0.6.0-beta.2.** L'interfaccia usa il flusso operativo del gestionale. Questa revisione introduce il driver Shelly nativo e gli attuatori basati su entità HA: prima della distribuzione ai clienti resta necessario il collaudo del driver su hardware e su un'installazione Home Assistant reale pulita. La suite automatica usa dispositivi simulati e non certifica il cablaggio dell'impianto.
+**Versione in revisione: 0.6.0-beta.3.** L'interfaccia usa il flusso operativo del gestionale. Questa revisione aggiunge italiano e inglese automatici alle pagine ospiti e conserva i driver Shelly ed entità HA: prima della distribuzione ai clienti resta necessario il collaudo del driver su hardware e su un'installazione Home Assistant reale pulita. La suite automatica usa dispositivi simulati e non certifica il cablaggio dell'impianto.
 
 ## Installazione su un nuovo Home Assistant
 
@@ -33,6 +33,12 @@ Il componente non è limitato agli Shelly. Da **Varchi → Aggiungi varco Home A
 Per i relè generici puoi scegliere un impulso di 0,5–5 secondi gestito dal componente, senza creare automazioni o script. Lo spegnimento dipende da HA e dalla rete: se si interrompono può ritardare. Il componente salva l’intento di ripristino prima dell’ON, tenta OFF anche su timeout/cancellazione e ripristina solo OFF al caricamento; se non conferma OFF, mantiene il varco bloccato e mostra il ripristino riservato all’amministratore. Un timer locale del dispositivo è preferibile; per marche senza API dedicata deve essere configurato e verificato sul dispositivo, poi confermato nella procedura. La configurazione hardware automatica resta disponibile per gli Shelly supportati.
 
 Il PIN della prenotazione **non viene inoltrato alla serratura** come codice hardware. Le serrature che richiedono un codice dispositivo esplicito vengono escluse dalla selezione diretta: possono essere gestite tramite uno script locale dedicato già configurato. Per dispositivi con altri tipi di entità o azioni proprietarie si può usare lo stesso adattamento tramite script, senza consentire servizi arbitrari al portale ospite.
+
+## Lingua della pagina ospiti
+
+La pagina aperta dal QR sceglie automaticamente italiano o inglese dalle preferenze del browser (`Accept-Language`), anche senza JavaScript. Sono supportate le varianti regionali, come `it-IT`, `en-US` ed `en-GB`, e l’ordine di preferenza delle lingue dichiarate. Se nessuna lingua supportata è richiesta, usa l’inglese; senza preferenze dichiarate conserva l’italiano.
+
+Sono tradotti titolo, istruzioni, campo codice, pulsante, assistenza, conferma, codice rifiutato, sessione scaduta, limiti dei tentativi e accesso non disponibile. I nomi delle porte e il marchio non vengono tradotti. Non vengono usati servizi di traduzione esterni e non servono nuovi QR. Per i dettagli e le verifiche vedere [Lingue ospiti](docs/GUEST-LANGUAGES.md).
 
 ## Uso da parte del gestore
 
