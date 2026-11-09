@@ -103,3 +103,13 @@ def test_edit_options_preserves_operator_options():
         assert "edit_gate" in options["gates"]["menu_options"]
         assert "edit_gate_details" in options
         assert "operator_user_ids" in options["access"]["data"]
+
+def test_websocket_gate_remapping_uses_booking_guard_and_invalidates_sessions():
+    source = (ROOT / "api.py").read_text(encoding="utf-8")
+    assert 'sensitive_change = any(' in source
+    assert 'for key in ("entity_id", "action", "kind")' in source
+    assert 'check_gate_removal(original["id"], manager.data["bookings"])' in source
+    assert 'original["enabled"] = False' not in source
+    assert 'original["token"] = candidate["token"]' in source
+    assert 'manager.demo_sessions.clear()' in source
+    assert 'manager.public_demo_sessions.clear()' in source
