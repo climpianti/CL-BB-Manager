@@ -29,7 +29,8 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
             "<div class='result' role='status' aria-live='polite'>"
             "<span class='result-icon' aria-hidden='true'>✓</span>"
             "<strong>Richiesta completata</strong>"
-            ("<p>Comando di apertura inviato; verifica la porta.</p></div>" if physical\n             else "<p>Operazione virtuale eseguita correttamente.</p></div>")
+            ("<p>Comando di apertura inviato; verifica la porta.</p></div>" if physical
+             else "<p>Operazione virtuale eseguita correttamente.</p></div>")
         )
     else:
         form_html = (
