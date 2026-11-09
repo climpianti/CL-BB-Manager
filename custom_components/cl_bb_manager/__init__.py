@@ -21,6 +21,7 @@ from .public_http import PublicPilotView
 from .permanent_http import PermanentPilotView
 from .const import DOMAIN, MAX_EVENTS, PANEL_PATH, PANEL_RESOURCE, STORE_KEY
 from .models import public_booking
+from .hardware_staging import read_candidate
 from .property_migration import migrate_legacy_data, SCHEMA_VERSION
 from .property_scope import active_property_id, new_property, require_property_id, require_record_scope
 
@@ -120,6 +121,7 @@ class BBManager:
                 item.update({
                     key: gate[key] for key in ("entity_id", "action")
                 })
+                item["hardware_candidate"] = read_candidate(gate)
             gates.append(item)
         return {
             "structure": self.entry.data.get("structure_name", "B&B"),
