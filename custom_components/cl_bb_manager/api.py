@@ -274,6 +274,11 @@ def register_commands(hass):
         if gate is None:
             _error(connection, msg, "Varco inesistente.")
             return
+        try:
+            require_record_scope(gate, manager.property_id)
+        except ValueError as err:
+            _error(connection, msg, err)
+            return
         if len(str(gate.get("token", ""))) < 20:
             _error(connection, msg, "Token QR non valido.")
             return
