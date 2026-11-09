@@ -15,6 +15,7 @@ from homeassistant.components.http import HomeAssistantView
 from .const import DOMAIN
 from .access_history import add_access_event
 from .models import pin_matches
+from .property_scope import belongs_to_property
 from .security import charge_attempt, demo_target_allowed, candidate_bookings
 
 # No real actuator entities. These are ONLY the demo script IDs.
@@ -37,7 +38,7 @@ def find_gate(manager, token):
         raise web.HTTPNotFound()
     gate = next((g for g in manager.data["gates"]
                  if secrets.compare_digest(str(g["token"]), token)), None)
-    if not gate or not demo_target_allowed(gate, DEMO_SCRIPTS):
+    if not gate or not belongs_to_property(gate, manager.property_id) or not demo_target_allowed(gate, DEMO_SCRIPTS):
         raise web.HTTPNotFound()
     return gate
 
@@ -116,6 +117,7 @@ class GuestView(HomeAssistantView):
             if (
                 not manager.entry.options.get("demo_guest_portal", False)
                 or not current
+                or not belongs_to_property(current, manager.property_id)
                 or not demo_target_allowed(current, DEMO_SCRIPTS)
                 or current["entity_id"] != gate["entity_id"]
             ):
@@ -123,7 +125,7 @@ class GuestView(HomeAssistantView):
             if not (len(pin) == 8 and pin.isascii() and pin.isdecimal()):
                 return page(gate["name"], "Codice non valido o scaduto.", 403)
             try:
-                candidates = candidate_bookings(manager.data["bookings"], gate["id"])
+                candidates = candidate_bookings(manager.data["bookings"], gate["id"], property_id=manager.property_id)
             except ValueError:
                 raise web.HTTPServiceUnavailable()
             matched_booking = None
