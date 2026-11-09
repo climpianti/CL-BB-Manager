@@ -48,3 +48,40 @@
 - [ ] Installazione e verifica dell'endpoint demo nell'istanza Home Assistant reale
 - [ ] Collaudo da smartphone sulla stessa rete LAN, con PIN valido/non valido
 - [ ] Audit del reverse proxy e revisione indipendente per il portale permanente
+
+
+## Stato di riferimento — 2026-11-09
+- Release di riferimento: 0.5.0-alpha.6; le sezioni storiche sopra non rappresentano lo stato corrente di ogni funzionalità.
+- [x] Protezione delle modifiche ai varchi via WebSocket (PR #10): blocco in presenza di prenotazioni attive/future, disabilitazione e invalidazione delle sessioni QR in caso di rimappatura.
+- [ ] Collaudo end-to-end su installazione reale e smartphone: PIN valido, errato, scaduto, revocato; nessuna apertura fisica.
+- [ ] Revisione di sicurezza indipendente prima di abilitare accessi fisici o portale pubblico permanente.
+
+## Obiettivo di prodotto — integrazione HACS riutilizzabile
+Architettura **local-first**: ogni installazione Home Assistant conserva localmente dati, segreti e audit. Nessun servizio cloud obbligatorio. B&B Covone è un ambiente di collaudo, non un requisito del prodotto.
+
+### Milestone A — solidità dell'alpha
+- [ ] Test di autorizzazione WebSocket/HTTP, isolamento tra utenti e regressioni per modifiche ai varchi.
+- [ ] Migrazione dati con versionamento, backup/ripristino documentati e test di aggiornamento.
+- [ ] Verifica delle entità HA ammesse e procedure fail-closed in caso di errori o riavvii.
+- [ ] Documentazione operativa aggiornata e matrice dei test su HA supportati.
+
+### Milestone B — modello multi-struttura
+- [ ] Definire identificativi stabili per struttura, unità/camera, varco, prenotazione e utente.
+- [ ] Specificare isolamento dei dati, delle autorizzazioni e dell'audit per struttura; nessuna fuga incrociata.
+- [ ] Progettare migrazione retrocompatibile delle prenotazioni attuali a una struttura predefinita, con backup e rollback.
+- [ ] Prove su due strutture indipendenti, compresi conflitti di nomi e orari.
+
+### Milestone C — portale ospiti e sicurezza
+- [ ] Threat model per QR/PIN, proxy HTTPS, replay, enumerazione, rate limiting e revoca.
+- [ ] Portale mobile accessibile, senza credenziali HA, con autorizzazioni temporanee e test reali.
+- [ ] Consenso/trasparenza, minimizzazione, conservazione e cancellazione dei dati personali.
+- [ ] Accesso a dispositivi fisici solo dopo revisione indipendente e attivazione esplicita.
+
+### Milestone D — distribuzione beta HACS
+- [ ] Installazione/configurazione senza riferimenti hardcoded alla struttura di prova.
+- [ ] Traduzioni, diagnostica senza segreti, manuale installatore e troubleshooting.
+- [ ] CI su versioni HA/Python supportate, release versionate e test di upgrade/downgrade.
+- [ ] Beta controllata presso più B&B, raccolta bug e criteri di rilascio pubblico.
+
+### Criteri di rilascio
+Nessuna funzionalità di apertura fisica abilitata di default; nessun merge senza CI verde; migrazioni con backup e test; test di isolamento multi-struttura e revisione di sicurezza prima della beta pubblica.
