@@ -6,6 +6,7 @@ release remains compile-time disabled until independently reviewed.
 """
 from __future__ import annotations
 
+import math
 import secrets
 import time
 
@@ -17,6 +18,14 @@ from .property_scope import belongs_to_property
 # No config option, WebSocket call or stored record may override it.
 PHYSICAL_RELEASE_ENABLED = False
 PHYSICAL_OPEN_COOLDOWN_SECONDS = 12
+
+# Explicitly reviewed actuator pairs for the single-property physical pilot.
+# Fail closed for any script that is not paired with its expected Shelly relay.
+# New installations require a separate, reviewed pairing/provisioning workflow.
+PILOT_SCRIPT_RELAY = {
+    "script.cl_bb_porta_strada_impulso_locale": "switch.porta_strada",
+    "script.cl_bb_porta_scala_impulso_locale": "switch.porta_scale",
+}
 
 
 def physical_target(manager, gate: dict, hass, *, token: str | None = None):
@@ -51,10 +60,18 @@ def physical_target(manager, gate: dict, hass, *, token: str | None = None):
         return None
     if candidate["entity_id"].startswith("script.cl_bb_demo_"):
         return None
-    entity = hass.states.get(candidate["entity_id"])
-    if entity is None or getattr(entity, "state", None) != "off":
+    script_id = candidate["entity_id"]
+    relay_id = PILOT_SCRIPT_RELAY.get(script_id)
+    if relay_id is None:
         return None
-    return candidate["entity_id"]
+    entity = hass.states.get(script_id)
+    relay = hass.states.get(relay_id)
+    if (
+        entity is None or getattr(entity, "state", None) != "off"
+        or relay is None or getattr(relay, "state", None) != "off"
+    ):
+        return None
+    return script_id
 
 
 def approved_booking(booking: dict, gate_id: str, property_id: str) -> bool:
@@ -75,14 +92,15 @@ def take_cooldown(data: dict, gate_id: str, *, now: float | None = None) -> bool
     actuation. Even a timeout or uncertain outcome cannot immediately replay.
     """
     instant = time.time() if now is None else now
-    if not isinstance(instant, (int, float)):
+    if (type(instant) not in (int, float) or not math.isfinite(instant)):
         return False
     prior = data.setdefault("physical_last_action", {})
     if not isinstance(prior, dict):
         return False
     last = prior.get(gate_id)
     if last is not None and (
-        not isinstance(last, (int, float))
+        type(last) not in (int, float)
+        or not math.isfinite(last)
         or last > instant
         or instant - last < PHYSICAL_OPEN_COOLDOWN_SECONDS
     ):
