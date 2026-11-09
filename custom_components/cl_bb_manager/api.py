@@ -579,9 +579,15 @@ def register_commands(hass):
                 for gate in manager.data["gates"]
                 if gate.get("hardware_candidate") is not None
             ]
+        physical_on = manager.data.get("physical_access_enabled") is True
+        armed_gates = [
+            gate["id"] for gate in manager.data["gates"]
+            if gate.get("physical_enabled") is True and physical_on
+        ]
         connection.send_result(msg["id"], {
-            "hardware_control": "disabled",
-            "physical_qr_enabled": False,
+            "hardware_control": "enabled" if armed_gates else "disabled",
+            "physical_qr_enabled": bool(armed_gates),
+            "armed_gate_ids": armed_gates,
             "gates": report,
         })
 
