@@ -486,6 +486,77 @@ def register_commands(hass):
 
 
     @websocket_api.websocket_command({
+        "type": "cl_bb_manager/stage_hardware_gate",
+        vol.Required("gate_id"): str,
+        vol.Required("script_id"): str,
+    })
+    @websocket_api.async_response
+    async def stage_hardware_gate(hass, connection, msg):
+        """Admin-only metadata: never sends a device command or changes QR rights."""
+        from .guest import DEMO_SCRIPTS
+        from .hardware_staging import FIELD, prepare_candidate
+
+        manager = _authorize(hass, connection, msg, admin_only=True)
+        if manager is None:
+            return
+        try:
+            async with manager.lock:
+                matching = [
+                    gate for gate in manager.data["gates"]
+                    if gate.get("id") == msg["gate_id"]
+                ]
+                if len(matching) != 1:
+                    raise ValueError("Varco non disponibile.")
+                gate = matching[0]
+                if not demo_target_allowed(gate, DEMO_SCRIPTS):
+                    raise ValueError("Associazione solo a un varco demo verificato.")
+                candidate = prepare_candidate(
+                    gate, manager.property_id, msg["script_id"],
+                    hass.states.get(msg["script_id"]),
+                    virtual_script_ids=DEMO_SCRIPTS,
+                )
+                if any(
+                    other.get("id") != gate["id"]
+                    and isinstance(other.get(FIELD), dict)
+                    and other[FIELD].get("entity_id") == candidate["entity_id"]
+                    for other in manager.data["gates"]
+                ):
+                    raise ValueError("Script già proposto per un altro varco.")
+                gate[FIELD] = candidate
+                manager.audit("hardware_candidate_staged", gate["id"])
+                await manager.async_save()
+            connection.send_result(msg["id"], _summary(manager, connection))
+        except (ValueError, TypeError) as err:
+            _error(connection, msg, err)
+
+    @websocket_api.websocket_command({
+        "type": "cl_bb_manager/clear_hardware_gate",
+        vol.Required("gate_id"): str,
+    })
+    @websocket_api.async_response
+    async def clear_hardware_gate(hass, connection, msg):
+        """Remove a hardware candidate; QR token and booking ACL stay untouched."""
+        from .hardware_staging import clear_candidate
+
+        manager = _authorize(hass, connection, msg, admin_only=True)
+        if manager is None:
+            return
+        try:
+            async with manager.lock:
+                matching = [
+                    gate for gate in manager.data["gates"]
+                    if gate.get("id") == msg["gate_id"]
+                ]
+                if len(matching) != 1:
+                    raise ValueError("Varco non disponibile.")
+                clear_candidate(matching[0], manager.property_id)
+                manager.audit("hardware_candidate_cleared", msg["gate_id"])
+                await manager.async_save()
+            connection.send_result(msg["id"], _summary(manager, connection))
+        except (ValueError, TypeError) as err:
+            _error(connection, msg, err)
+
+    @websocket_api.websocket_command({
         "type": "cl_bb_manager/permanent_pilot_qr",
         vol.Required("gate_id"): str,
     })
@@ -568,6 +639,6 @@ def register_commands(hass):
             _error(connection, msg, err)
 
     for handler in (
-        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin, demo_qr, public_pilot_qr, permanent_pilot_qr, rotate_permanent_qr
+        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin, demo_qr, public_pilot_qr, permanent_pilot_qr, rotate_permanent_qr, stage_hardware_gate, clear_hardware_gate
     ):
         websocket_api.async_register_command(hass, handler)
