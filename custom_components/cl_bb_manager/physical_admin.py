@@ -9,7 +9,6 @@ from io import BytesIO
 import secrets
 
 from homeassistant.components import websocket_api
-import segno
 import voluptuous as vol
 
 from .const import DOMAIN
@@ -47,6 +46,7 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
         if manager is None:
             return
         try:
+            import segno
             origin = validate_public_origin(
                 hass.config.external_url
                 or manager.entry.options.get("public_pilot_origin", "")
