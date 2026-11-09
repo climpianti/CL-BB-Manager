@@ -46,6 +46,10 @@ test("L'URL esterno HA è la modalità QR predefinita e la LAN è opzionale", ()
   assert.ok(source.includes('this._hass?.config?.external_url'));
   assert.ok(source.includes('this._hass?.config?.internal_url'));
   assert.ok(source.includes('if(this.qrMode==="https")grid.append(publicCard)'));
+  assert.ok(source.indexOf('grid.append(fixed)') < source.indexOf('grid.append(publicCard)'));
+  assert.ok(source.includes('QR temporaneo · HTTPS · 10 minuti'));
+  assert.ok(source.includes('NON STAMPARE: questo QR scade dopo 10 minuti'));
+  assert.ok(source.includes('Genera / mostra QR fisso'));
   assert.ok(source.includes('if(this.qrMode==="lan")grid.append(qrCard)'));
   assert.ok(source.includes('this.api("public_pilot_qr"'));
   assert.ok(source.includes('this.api("demo_qr"'));
@@ -57,7 +61,7 @@ test("CL Control BlueTech Glass conserva navigazione e stati di collaudo", () =>
   assert.ok(source.includes('"dashboard","Panoramica"'));
   assert.ok(source.includes('"accessi","Accessi"'));
   assert.ok(source.includes('"impostazioni","Impostazioni"'));
-  assert.ok(source.includes('"Genera QR di accesso"'));
+  assert.ok(source.includes('"Genera QR temporaneo (10 minuti)"'));
   assert.ok(source.includes('Ambiente pilota · solo varchi virtuali'));
   assert.ok(!source.includes('this.button("Scarica QR"'));
 });
