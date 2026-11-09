@@ -83,11 +83,11 @@ def test_prepare_creates_distinct_dormant_token_then_emergency_revokes():
         assert not conn.errors
         result = conn.results[-1][1]
         assert result["armed"] is False
-        assert result["release_enabled"] is False
+        assert result["release_enabled"] is True
         assert result["url"].endswith(gate["physical_token"])
         assert gate["physical_token"] != original_demo_token
         assert gate["physical_enabled"] is False
-        assert physical_policy.PHYSICAL_RELEASE_ENABLED is False
+        assert physical_policy.PHYSICAL_RELEASE_ENABLED is True
         assert hass.calls == []
 
         # Stage a narrowly-scoped explicit booking authorization.
@@ -173,3 +173,68 @@ def test_gate_mapping_invalidation_revokes_physical_grants_only():
     assert booking["physical_gate_ids"] == []
     assert booking["gate_ids"] == [gate["id"]]
     assert hass.calls == []
+
+
+def test_explicit_arm_is_persistent_then_per_gate_disarm_and_emergency():
+    async def check():
+        manager, hass = setup()
+        gate = manager.data["gates"][0]
+        booking = manager.data["bookings"][0]
+        conn = Connection()
+        arm = {"id": 5, "gate_id": gate["id"], "confirm": True}
+        # No QR = no arming.
+        await registered["arm_physical_gate"](hass, conn, arm)
+        assert conn.errors and not conn.results
+        conn.errors.clear()
+        await registered["prepare_physical_qr"](
+            hass, conn, {"id": 1, "gate_id": gate["id"], "confirm": True}
+        )
+        prepared_token = gate["physical_token"]
+        # No explicit booking grant = no arming.
+        await registered["arm_physical_gate"](hass, conn, arm)
+        assert conn.errors
+        conn.errors.clear()
+        await registered["grant_physical_booking"](
+            hass, conn, {"id": 2, "booking_id": booking["id"], "gate_id": gate["id"], "confirm": True}
+        )
+        await registered["arm_physical_gate"](hass, conn, arm)
+        assert not conn.errors
+        assert manager.data["physical_access_enabled"] is True
+        assert gate["physical_enabled"] is True
+        assert conn.results[-1][1]["persistent"] is True
+        assert physical_policy.physical_target(manager, gate, hass, token=prepared_token) == "script.cl_bb_porta_scala_impulso_locale"
+        # Disarming does not expire or rotate the printed QR.
+        await registered["disarm_physical_gate"](hass, conn, arm)
+        assert gate["physical_enabled"] is False
+        assert gate["physical_token"] == prepared_token
+        assert physical_policy.physical_target(manager, gate, hass, token=prepared_token) is None
+        await registered["arm_physical_gate"](hass, conn, arm)
+        assert gate["physical_enabled"] is True
+        await registered["emergency_disable_physical"](hass, conn, {"id": 9, "confirm": True})
+        assert manager.data["physical_access_enabled"] is False
+        assert "physical_token" not in gate
+        assert booking.get("physical_gate_ids") == []
+        assert hass.calls == []
+    run(check())
+
+
+def test_relay_unavailable_prevents_arming():
+    async def check():
+        manager, hass = setup()
+        gate = manager.data["gates"][0]
+        booking = manager.data["bookings"][0]
+        conn = Connection()
+        await registered["prepare_physical_qr"](
+            hass, conn, {"id": 1, "gate_id": gate["id"], "confirm": True}
+        )
+        await registered["grant_physical_booking"](
+            hass, conn, {"id": 2, "booking_id": booking["id"], "gate_id": gate["id"], "confirm": True}
+        )
+        hass.states["switch.porta_scale"].state = "unavailable"
+        await registered["arm_physical_gate"](
+            hass, conn, {"id": 3, "gate_id": gate["id"], "confirm": True}
+        )
+        assert conn.errors
+        assert gate["physical_enabled"] is False
+        assert hass.calls == []
+    run(check())
