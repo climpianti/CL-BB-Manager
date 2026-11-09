@@ -116,15 +116,25 @@ def register_commands(hass):
                        and g["entity_id"] == candidate["entity_id"]
                        for g in manager.data["gates"]):
                     raise ValueError("Entità già associata a un altro varco.")
-                changed_mapping = (original["entity_id"] != candidate["entity_id"]
-                                   or original["action"] != candidate["action"])
+                sensitive_change = any(
+                    original[key] != candidate[key]
+                    for key in ("entity_id", "action", "kind")
+                )
+                if sensitive_change:
+                    # Keep active/future bookings bound to the same gate mapping.
+                    check_gate_removal(original["id"], manager.data["bookings"])
                 original.update({
                     "name": candidate["name"],
                     "entity_id": candidate["entity_id"],
                     "action": candidate["action"],
                     "kind": candidate["kind"],
-                    "enabled": False if changed_mapping else msg["enabled"],
+                    "enabled": False if sensitive_change else msg["enabled"],
                 })
+                if sensitive_change:
+                    # Mapping changes require deliberate re-enabling and revoke old QR sessions.
+                    original["token"] = candidate["token"]
+                    manager.demo_sessions.clear()
+                    manager.public_demo_sessions.clear()
                 manager.audit("gate_updated", original["name"])
                 await manager.async_save()
         except ValueError as err:
