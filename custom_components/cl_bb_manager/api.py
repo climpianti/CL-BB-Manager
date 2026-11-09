@@ -138,6 +138,7 @@ def register_commands(hass):
                     original["token"] = candidate["token"]
                     manager.demo_sessions.clear()
                     manager.public_demo_sessions.clear()
+                    manager.permanent_forms.clear()
                 manager.audit("gate_updated", original["name"])
                 await manager.async_save()
         except ValueError as err:
@@ -164,6 +165,7 @@ def register_commands(hass):
                     raise ValueError("Varco inesistente.")
                 require_record_scope(gate, manager.property_id)
                 check_gate_removal(gate["id"], manager.data["bookings"])
+                manager.permanent_forms.clear()
                 manager.data["gates"].remove(gate)
                 manager.audit("gate_removed", gate["name"])
                 await manager.async_save()
@@ -482,7 +484,90 @@ def register_commands(hass):
         except (ValueError, TypeError) as err:
             _error(connection, msg, err)
 
+
+    @websocket_api.websocket_command({
+        "type": "cl_bb_manager/permanent_pilot_qr",
+        vol.Required("gate_id"): str,
+    })
+    @websocket_api.async_response
+    async def permanent_pilot_qr(hass, connection, msg):
+        """Return a repeatable, printable QR; does not grant any access."""
+        from io import BytesIO
+        import segno
+        from .guest import DEMO_SCRIPTS
+        from .permanent_policy import permanent_url
+        from .public_policy import validate_public_origin
+
+        manager = _authorize(hass, connection, msg, admin_only=True)
+        if manager is None:
+            return
+        try:
+            if not manager.entry.options.get("permanent_pilot_enabled", False):
+                raise ValueError("Abilitare prima il QR fisso virtuale nelle opzioni.")
+            origin = validate_public_origin(
+                hass.config.external_url
+                or manager.entry.options.get("public_pilot_origin", "")
+            )
+            async with manager.lock:
+                gates = [g for g in manager.data["gates"] if g.get("id") == msg["gate_id"]]
+                if len(gates) != 1:
+                    raise ValueError("Varco non disponibile.")
+                gate = gates[0]
+                require_record_scope(gate, manager.property_id)
+                if not demo_target_allowed(gate, DEMO_SCRIPTS):
+                    raise ValueError("Solo i varchi virtuali abilitati possono usare QR fissi.")
+                url = permanent_url(origin, gate["token"])
+            buffer = BytesIO()
+            segno.make_qr(url).save(buffer, kind="svg", scale=8, border=4)
+            connection.send_result(msg["id"], {
+                "svg": buffer.getvalue().decode("utf-8"),
+                "url": url,
+                "permanent": True,
+                "printable": True,
+                "hardware_control": "disabled",
+            })
+        except (ValueError, TypeError) as err:
+            _error(connection, msg, err)
+
+    @websocket_api.websocket_command({
+        "type": "cl_bb_manager/rotate_permanent_qr",
+        vol.Required("gate_id"): str,
+        vol.Required("confirm"): vol.Equal(True),
+    })
+    @websocket_api.async_response
+    async def rotate_permanent_qr(hass, connection, msg):
+        """Revoke a printed QR without editing a gate or changing bookings."""
+        import secrets
+
+        manager = _authorize(hass, connection, msg, admin_only=True)
+        if manager is None:
+            return
+        try:
+            async with manager.lock:
+                gates = [g for g in manager.data["gates"] if g.get("id") == msg["gate_id"]]
+                if len(gates) != 1:
+                    raise ValueError("Varco non disponibile.")
+                gate = gates[0]
+                require_record_scope(gate, manager.property_id)
+                old_token = gate.get("token")
+                replacement = secrets.token_urlsafe(32)
+                while replacement == old_token:
+                    replacement = secrets.token_urlsafe(32)
+                gate["token"] = replacement
+                manager.permanent_forms.clear()
+                manager.demo_sessions.clear()
+                manager.public_demo_sessions.clear()
+                manager.audit("permanent_qr_rotated", gate["id"])
+                await manager.async_save()
+            connection.send_result(msg["id"], {
+                "rotated": True,
+                "gate_id": msg["gate_id"],
+                "message": "Vecchio QR revocato. Stampare e sostituire il nuovo QR.",
+            })
+        except (ValueError, TypeError) as err:
+            _error(connection, msg, err)
+
     for handler in (
-        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin, demo_qr, public_pilot_qr
+        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin, demo_qr, public_pilot_qr, permanent_pilot_qr, rotate_permanent_qr
     ):
         websocket_api.async_register_command(hass, handler)

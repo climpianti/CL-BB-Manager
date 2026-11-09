@@ -1,5 +1,5 @@
 class ClBbManagerPanel extends HTMLElement {
- constructor(){super();this.attachShadow({mode:"open"});this.loaded=false;this.tab="dashboard";this.data=null;this.error="";this.pin="";this.testResult=null;this.testBusy=false;this.demoQR=null;this.demoTargetGateId=null;this.qrMode="https";}
+ constructor(){super();this.attachShadow({mode:"open"});this.loaded=false;this.tab="dashboard";this.data=null;this.error="";this.pin="";this.testResult=null;this.testBusy=false;this.demoQR=null;this.permanentQR=null;this.demoTargetGateId=null;this.qrMode="https";}
  set hass(h){this._hass=h;if(!this.loaded){this.loaded=true;this.load();}}
  api(type,body={}){return this._hass.callWS({type:"cl_bb_manager/"+type,...body});}
  async load(){try{this.data=await this.api("list");this.error="";}catch(e){this.error=this.describeError(e);}this.render();}
@@ -12,10 +12,10 @@ class ClBbManagerPanel extends HTMLElement {
  select(form,label,name,options,selected){const wrap=this.node("label",label);const s=this.node("select");s.name=name;for(const [v,t] of options){const o=this.node("option",t);o.value=v;o.selected=v===selected;s.append(o);}wrap.append(s);form.append(wrap);}
  card(title){const a=this.node("section","","card");a.append(this.node("h2",title));return a;}
  render(){const root=this.shadowRoot;root.replaceChildren();const style=this.node("style");
- style.textContent="@import url('/cl_bb_manager_static/bluetech-glass.css?v=0.5.0-alpha.7');";root.append(style);
+ style.textContent="@import url('/cl_bb_manager_static/bluetech-glass.css?v=0.5.0-alpha.8');";root.append(style);
  const page=this.node("main","","page");root.append(page);const hero=this.node("header","","hero");
  const brand=this.node("div","","hero-brand");
- const logo=this.node("img");logo.src="/cl_bb_manager_static/cl-impianti-logo.svg?v=0.5.0-alpha.7";logo.alt="CL Impianti";logo.className="brand-logo";logo.decoding="async";brand.append(logo);
+ const logo=this.node("img");logo.src="/cl_bb_manager_static/cl-impianti-logo.svg?v=0.5.0-alpha.8";logo.alt="CL Impianti";logo.className="brand-logo";logo.decoding="async";brand.append(logo);
  const brandText=this.node("span","","brand-word");
  brandText.append(this.node("strong","CL CONTROL"),this.node("small","Hospitality · Access Manager"));
  brand.append(brandText);
@@ -56,7 +56,7 @@ class ClBbManagerPanel extends HTMLElement {
    grid.append(welcome);
    const status=this.card("Stato dei servizi");
    status.append(this.node("p","QR HTTPS temporanei: "+(this.data.public_pilot==="enabled"?"Abilitati":"Disabilitati")));
-   status.append(this.node("p","Portale QR permanente: disattivato"));
+   status.append(this.node("p","QR fisso HTTPS virtuale: "+(this.data.permanent_pilot==="enabled"?"Abilitato (pilota)":"Disabilitato")));
    status.append(this.node("p","I comandi agiscono soltanto su varchi virtuali in questa versione.","small"));
    grid.append(status);
  }
@@ -70,7 +70,7 @@ class ClBbManagerPanel extends HTMLElement {
    grid.append(addresses);
    const security=this.card("Sicurezza e modalità di accesso");
    security.append(this.node("p","QR HTTPS temporanei: "+(this.data.public_pilot==="enabled"?"Abilitati":"Disabilitati")));
-   security.append(this.node("p","Portale QR permanente: disattivato"));
+   security.append(this.node("p","QR fisso HTTPS virtuale: "+(this.data.permanent_pilot==="enabled"?"Abilitato (pilota)":"Disabilitato")));
    security.append(this.node("p","Serrature e attuatori fisici: non collegati"));
    security.append(this.node("p","I QR temporanei durano 10 minuti e, dopo un comando riuscito, non sono riutilizzabili. In questa versione funzionano esclusivamente con gli script virtuali consentiti.","small"));
    grid.append(security);
@@ -212,6 +212,52 @@ class ClBbManagerPanel extends HTMLElement {
      publicCard.append(preview);
    }
    if(this.qrMode==="https")grid.append(publicCard);
+
+    if(this.qrMode==="https" && this.data.role==="admin"){
+      const fixed=this.card("QR permanente stampabile · varchi virtuali");
+      fixed.append(this.node("p","Il QR resta uguale per ogni porta, anche cambiando gli ospiti. Ogni accesso richiede un PIN valido, e l'amministratore può revocare il QR stampato. Non utilizzare su porte fisiche.","small"));
+      if(this.data.permanent_pilot!=="enabled"){
+        fixed.append(this.node("p","Attiva «QR permanente solo varchi virtuali» nelle opzioni dell'integrazione. Richiede dominio HTTPS.","notice"));
+      }else{
+        const form=this.node("form");
+        this.select(form,"Varco per QR fisso","gate_id",gates.map(g=>[g.id,g.name]),this.demoTargetGateId||gates[0].id);
+        const submit=this.node("button","Genera / mostra QR fisso");submit.type="submit";form.append(submit);
+        form.onsubmit=async event=>{
+          event.preventDefault();if(this.testBusy||!form.reportValidity())return;
+          this.testBusy=true;submit.disabled=true;
+          try{
+            const gate_id=String(new FormData(form).get("gate_id"));
+            const result=await this.api("permanent_pilot_qr",{gate_id});
+            this.permanentQR={...result,gate_id,gate:gates.find(g=>g.id===gate_id)?.name||"Varco"};
+            this.error="";
+          }catch(err){this.permanentQR=null;this.error=this.describeError(err);}
+          finally{this.testBusy=false;this.render();}
+        };
+        fixed.append(form);
+        if(this.permanentQR){
+          const preview=this.node("div");
+          const img=this.node("img");img.width=260;img.height=260;img.alt="QR permanente virtuale per "+this.permanentQR.gate;
+          const svgData="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(this.permanentQR.svg);
+          img.src=svgData;preview.append(img);
+          preview.append(this.node("p","QR stabile · stampabile · valido finché non viene revocato. Solo collaudo virtuale.","small"));
+          const download=this.node("a","Scarica QR SVG da stampare");
+          download.href=svgData;download.download="CL-BB-QR-"+this.permanentQR.gate_id+".svg";preview.append(download);
+          const link=this.node("a","Apri pagina di accesso");
+          link.href=this.permanentQR.url;link.target="_blank";link.rel="noreferrer noopener";preview.append(link);
+          preview.append(this.button("Revoca QR e genera un nuovo codice",async()=>{
+            if(!confirm("ATTENZIONE: il QR stampato non funzionerà più. Dovrai sostituirlo sulla porta. Procedere?"))return;
+            try{
+              await this.api("rotate_permanent_qr",{gate_id:this.permanentQR.gate_id,confirm:true});
+              this.permanentQR=null;this.error="Vecchio QR revocato. Genera, stampa e applica il nuovo QR.";
+              await this.load();
+            }catch(err){this.error=this.describeError(err);this.render();}
+          }));
+          fixed.append(preview);
+        }
+      }
+      grid.append(fixed);
+    }
+
    const qrCard=this.card("QR di accesso · rete locale");
    qrCard.append(this.node(
      "p",

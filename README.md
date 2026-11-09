@@ -1,6 +1,6 @@
 # CL B&B Manager
 
-**Versione 0.5.0-alpha.7 — migrazione sicura delle strutture, isolamento dei dati e collaudo QR/PIN solo virtuale. Non per accessi reali in produzione.**
+**Versione 0.5.0-alpha.8 — QR fisso stampabile HTTPS con PIN, soltanto per varchi virtuali, attivabile esplicitamente. Non per accessi reali in produzione.**
 
 Integrazione custom per Home Assistant, progettata da CL Impianti per la gestione di varchi, camere e prenotazioni nei B&B.
 
@@ -96,3 +96,12 @@ Nel pannello **Collaudo accessi** il percorso **HTTPS esterno** è predefinito e
 ## Stato collaudo e percorso beta
 
 Consulta [Checklist pre-beta](docs/BETA-READINESS.md) prima di distribuire questa versione. L’aggiornamento HACS si applica al riavvio Home Assistant. La scansione QR su smartphone e il flusso completo PIN valido → autorizzazione → impulso virtuale richiedono ancora una prova end-to-end in ambiente di test; non dichiararli verificati sulla base dei soli test unitari o di un impulso virtuale avviato manualmente.
+
+
+## QR permanente stampabile · pilota virtuale (alpha.8)
+
+Nelle **opzioni dell'integrazione** attiva esplicitamente **QR permanente solo varchi virtuali**, con un dominio HTTPS pubblico valido. Nella scheda **Accessi → Connessione → Accesso da Internet**, l'amministratore seleziona il varco, genera/visualizza il QR fisso, e scarica l'SVG da stampare. Il QR contiene il token persistente del varco, **non contiene il PIN** e resta uguale tra prenotazioni, riavvii e rigenerazioni. Ogni richiesta richiede una sessione web temporanea, il PIN valido e una prenotazione che autorizzi quel varco nel periodo selezionato.
+
+**Revoca QR:** con **Revoca QR e genera un nuovo codice** un amministratore può invalidare il QR stampato; sarà necessario sostituirlo sulla porta. Cambiare la mappatura del varco invalida automaticamente il QR precedente. Disabilitare il pilot rende il percorso non disponibile. I QR permanenti non sono monouso, ma i moduli web di verifica lo sono. Non utilizzare questa funzione su serrature o attuatori fisici: il server accetta soltanto i cinque script dimostrativi. Il portale legacy `/guest/` resta inattivo.
+
+**Stato:** implementazione virtuale sperimentale. Richiede test CI, collaudo HTTPS/reverse proxy da smartphone e revisione indipendente prima dell'esposizione a ospiti reali.

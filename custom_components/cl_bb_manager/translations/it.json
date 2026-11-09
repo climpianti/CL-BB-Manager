@@ -25,11 +25,12 @@
       },
       "access": {
         "title": "Accesso HTTPS e operatori",
-        "description": "Operatori attualmente salvati: {current_operators}. Puoi aggiungere o rimuovere gli utenti selezionati, quindi salvare. Gli amministratori hanno gia accesso completo. I QR restano limitati ai varchi virtuali.",
+        "description": "Operatori attualmente salvati: {current_operators}. Puoi aggiungere o rimuovere gli utenti selezionati, quindi salvare. Gli amministratori hanno gia accesso completo. I QR restano limitati ai varchi virtuali. Il QR fisso è disabilitato per impostazione predefinita e opera solo su script virtuali approvati. I QR stampati restano validi finché non vengono revocati o ruotati dall'amministratore.",
         "data": {
           "public_pilot_enabled": "Abilita accesso temporaneo HTTPS",
           "public_pilot_origin": "Indirizzo pubblico HTTPS (automatico da Home Assistant)",
-          "operator_user_ids": "Operatori B&B autorizzati"
+          "operator_user_ids": "Operatori B&B autorizzati",
+          "permanent_pilot_enabled": "Abilita QR permanente solo per varchi virtuali (pilota)"
         }
       },
       "gates": {
