@@ -33,7 +33,7 @@ def add_access_event(
         raise ValueError("Access event time must include a timezone")
     stamp = instant.astimezone(timezone.utc)
     property_id = require_property_id(gate.get("property_id"))
-    if booking is not None and booking.get("property_id") != property_id:
+    if result == "authorized" and booking is not None and booking.get("property_id") != property_id:
         raise ValueError("Prenotazione di un altra struttura.")
     matched = booking if result == "authorized" and booking else {}
     entry = {
