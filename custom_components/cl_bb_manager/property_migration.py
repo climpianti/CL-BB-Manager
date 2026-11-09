@@ -9,7 +9,7 @@ from copy import deepcopy
 
 from .property_scope import require_property_id
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 RECORD_COLLECTIONS = ("gates", "bookings", "events", "access_history")
 
 
@@ -21,7 +21,7 @@ def migrate_legacy_data(data: dict, property_id: str, property_name: str) -> dic
     if not isinstance(data, dict):
         raise ValueError("Archivio non valido.")
     current = data.get("schema_version", 1)
-    if type(current) is not int or current not in (1, SCHEMA_VERSION):
+    if type(current) is not int or current not in (1, 2, SCHEMA_VERSION):
         raise ValueError("Versione archivio non supportata.")
     result = deepcopy(data)
     for collection in RECORD_COLLECTIONS:

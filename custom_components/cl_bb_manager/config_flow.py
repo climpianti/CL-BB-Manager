@@ -7,6 +7,7 @@ from homeassistant.helpers import selector
 
 from .const import DOMAIN, MAX_GATES
 from .gate_management import check_gate_removal
+from .property_scope import require_record_scope
 from .models import make_gate
 from .permissions import MAX_OPERATORS, OPTION_OPERATOR_USERS, operator_user_ids
 from .public_policy import validate_public_origin
@@ -158,6 +159,7 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
                         for item in manager.data["gates"]
                     ):
                         raise ValueError("Entità già associata a un varco.")
+                    gate["property_id"] = manager.property_id
                     manager.data["gates"].append(gate)
                     manager.audit("gate_added", gate["name"])
                     await manager.async_save()
@@ -259,6 +261,7 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
                     )
                     if current is None:
                         return self.async_abort(reason="invalid_gate")
+                    require_record_scope(current, manager.property_id)
                     if any(
                         item["id"] != gate_id
                         and item["entity_id"] == candidate["entity_id"]
@@ -366,6 +369,7 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
             )
             if gate is None:
                 return self.async_abort(reason="invalid_gate")
+            require_record_scope(gate, manager.property_id)
             name = gate["name"]
             if user_input is not None and user_input.get("confirm") is True:
                 try:

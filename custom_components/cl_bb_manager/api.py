@@ -13,6 +13,7 @@ from .const import DOMAIN, MAX_BOOKINGS, MAX_GATES
 from .models import as_utc, generate_pin, make_booking, make_gate, pin_matches
 from .gate_management import check_gate_removal
 from .permissions import user_role
+from .property_scope import assert_gate_scope, require_record_scope
 from .security import charge_attempt, demo_target_allowed, candidate_bookings
 
 
@@ -81,6 +82,7 @@ def register_commands(hass):
                 if any(g["entity_id"] == gate["entity_id"]
                        for g in manager.data["gates"]):
                     raise ValueError("Questa entità è già associata a un varco.")
+                gate["property_id"] = manager.property_id
                 manager.data["gates"].append(gate)
                 manager.audit("gate_added", gate["name"])
                 await manager.async_save()
@@ -112,6 +114,7 @@ def register_commands(hass):
                 )
                 if original is None:
                     raise ValueError("Varco inesistente.")
+                require_record_scope(original, manager.property_id)
                 if any(g["id"] != original["id"]
                        and g["entity_id"] == candidate["entity_id"]
                        for g in manager.data["gates"]):
@@ -159,6 +162,7 @@ def register_commands(hass):
                 )
                 if gate is None:
                     raise ValueError("Varco inesistente.")
+                require_record_scope(gate, manager.property_id)
                 check_gate_removal(gate["id"], manager.data["bookings"])
                 manager.data["gates"].remove(gate)
                 manager.audit("gate_removed", gate["name"])
@@ -191,12 +195,15 @@ def register_commands(hass):
             if as_utc(booking["end"]) <= datetime.now(timezone.utc):
                 raise ValueError("Check-out già trascorso.")
             async with manager.lock:
+                property_id = manager.property_id
+                assert_gate_scope(manager.data["gates"], booking["gate_ids"], property_id)
                 selected = set(booking["gate_ids"])
-                allowed = {g["id"] for g in manager.data["gates"] if g["enabled"]}
+                allowed = {g["id"] for g in manager.data["gates"] if g["enabled"] and g.get("property_id") == property_id}
                 if not selected.issubset(allowed):
                     raise ValueError("Uno o più varchi non sono abilitati.")
                 if len(manager.data["bookings"]) >= MAX_BOOKINGS:
                     raise ValueError("Numero massimo di prenotazioni raggiunto.")
+                booking["property_id"] = property_id
                 manager.data["bookings"].append(booking)
                 manager.audit("booking_added", booking["room"])
                 await manager.async_save()
@@ -221,6 +228,7 @@ def register_commands(hass):
                                 if b["id"] == msg["booking_id"]), None)
                 if booking is None:
                     raise ValueError("Prenotazione inesistente.")
+                require_record_scope(booking, manager.property_id)
                 booking["revoked"] = True
                 manager.audit("booking_revoked", booking["room"])
                 await manager.async_save()
@@ -266,6 +274,11 @@ def register_commands(hass):
         if gate is None:
             _error(connection, msg, "Varco inesistente.")
             return
+        try:
+            require_record_scope(gate, manager.property_id)
+        except ValueError as err:
+            _error(connection, msg, err)
+            return
         if len(str(gate.get("token", ""))) < 20:
             _error(connection, msg, "Token QR non valido.")
             return
@@ -306,6 +319,7 @@ def register_commands(hass):
                 )
                 if gate is None or not demo_target_allowed(gate, DEMO_SCRIPTS):
                     raise ValueError("Varco demo inesistente o non abilitato.")
+                require_record_scope(gate, manager.property_id)
                 # Counter is persisted before attempting any PIN work.
                 throttle = manager.data.setdefault("attempts", {"all": [], "gates": {}})
                 if not charge_attempt(throttle, gate["id"]):
@@ -313,7 +327,7 @@ def register_commands(hass):
                     raise ValueError("Limite di tentativi superato.")
                 await manager.async_save()
                 candidates = candidate_bookings(
-                    manager.data["bookings"], gate["id"]
+                    manager.data["bookings"], gate["id"], property_id=manager.property_id
                 )
                 authorized = False
                 for booking in candidates:
@@ -371,6 +385,7 @@ def register_commands(hass):
             )
             if gate is None or not demo_target_allowed(gate, DEMO_SCRIPTS):
                 raise ValueError("Seleziona uno dei cinque varchi demo abilitati.")
+            require_record_scope(gate, manager.property_id)
             if hass.states.get(gate["entity_id"]) is None:
                 raise ValueError("Script virtuale non disponibile.")
             # Protect session bookkeeping under the same manager lock.
@@ -438,6 +453,7 @@ def register_commands(hass):
             )
             if gate is None or not demo_target_allowed(gate, DEMO_SCRIPTS):
                 raise ValueError("Varco virtuale non autorizzato.")
+            require_record_scope(gate, manager.property_id)
             if hass.states.get(gate["entity_id"]) is None:
                 raise ValueError("Script virtuale non disponibile.")
 

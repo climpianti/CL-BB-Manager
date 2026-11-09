@@ -16,6 +16,7 @@ from .access_history import add_access_event
 from .demo_policy import is_lan_peer, valid_demo_session, valid_form_origin
 from .guest import DEMO_SCRIPTS
 from .models import pin_matches
+from .property_scope import belongs_to_property
 from .security import candidate_bookings, charge_attempt, demo_target_allowed
 
 
@@ -134,7 +135,7 @@ def _session_and_gate(request, token: str):
         (g for g in manager.data["gates"] if g["id"] == session["gate_id"]),
         None,
     )
-    if gate is None or not demo_target_allowed(gate, DEMO_SCRIPTS):
+    if gate is None or not belongs_to_property(gate, manager.property_id) or not demo_target_allowed(gate, DEMO_SCRIPTS):
         raise web.HTTPNotFound()
     return hass, manager, session, gate
 
@@ -204,7 +205,7 @@ class DemoPortalView(HomeAssistantView):
                 (g for g in manager.data["gates"] if g["id"] == gate["id"]),
                 None,
             )
-            if current_gate is None or not demo_target_allowed(
+            if current_gate is None or not belongs_to_property(current_gate, manager.property_id) or not demo_target_allowed(
                 current_gate, DEMO_SCRIPTS
             ):
                 raise web.HTTPNotFound()
@@ -225,7 +226,7 @@ class DemoPortalView(HomeAssistantView):
                 return _response(gate["name"], "Codice non valido o scaduto.", 403, form_csrf=session["form_csrf"])
 
             try:
-                candidates = candidate_bookings(manager.data["bookings"], gate["id"])
+                candidates = candidate_bookings(manager.data["bookings"], gate["id"], property_id=manager.property_id)
             except ValueError as exc:
                 raise web.HTTPServiceUnavailable() from exc
 

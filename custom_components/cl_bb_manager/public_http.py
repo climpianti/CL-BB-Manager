@@ -16,6 +16,7 @@ from .demo_http import _response
 from .demo_policy import valid_form_origin
 from .guest import DEMO_SCRIPTS
 from .models import pin_matches
+from .property_scope import belongs_to_property
 from .public_policy import valid_public_session
 from .security import charge_attempt, candidate_bookings, demo_target_allowed
 
@@ -33,7 +34,7 @@ def _context(request, token):
         (g for g in manager.data["gates"] if g["id"] == session["gate_id"]),
         None,
     )
-    if not gate or not demo_target_allowed(gate, DEMO_SCRIPTS):
+    if not gate or not belongs_to_property(gate, manager.property_id) or not demo_target_allowed(gate, DEMO_SCRIPTS):
         raise web.HTTPNotFound()
     return hass, manager, session, gate
 
@@ -93,7 +94,7 @@ class PublicPilotView(HomeAssistantView):
                 (g for g in manager.data["gates"] if g["id"] == gate["id"]),
                 None,
             )
-            if not current or not demo_target_allowed(current, DEMO_SCRIPTS):
+            if not current or not belongs_to_property(current, manager.property_id) or not demo_target_allowed(current, DEMO_SCRIPTS):
                 raise web.HTTPNotFound()
 
             throttle = manager.data.setdefault(
@@ -114,7 +115,7 @@ class PublicPilotView(HomeAssistantView):
                 return _response(gate["name"], "Codice non valido o scaduto.", 403)
             try:
                 bookings = candidate_bookings(
-                    manager.data["bookings"], gate["id"]
+                    manager.data["bookings"], gate["id"], property_id=manager.property_id
                 )
             except ValueError as exc:
                 raise web.HTTPServiceUnavailable() from exc

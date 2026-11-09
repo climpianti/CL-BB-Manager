@@ -27,7 +27,7 @@ def test_migration_preserves_records_and_does_not_mutate_input():
     before = deepcopy(original)
     result = migration.migrate_legacy_data(original, pid, "Covone")
     assert original == before
-    assert result["schema_version"] == 2
+    assert result["schema_version"] == 3
     assert result["properties"] == [{"id": pid, "name": "Covone"}]
     for key in migration.RECORD_COLLECTIONS:
         assert all(record["property_id"] == pid for record in result[key])

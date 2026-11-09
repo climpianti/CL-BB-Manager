@@ -52,3 +52,23 @@ def assert_gate_scope(
         matches = [gate for gate in gates if isinstance(gate, dict) and gate.get("id") == gate_id]
         if len(matches) != 1 or not belongs_to_property(matches[0], property_id):
             raise ValueError("Varco non appartenente alla struttura.")
+
+
+def active_property_id(data: dict) -> str:
+    """Return the only configured property; reject ambiguous/corrupt stores."""
+    if not isinstance(data, dict) or type(data.get("schema_version")) is not int or data["schema_version"] != 3:
+        raise ValueError("Versione archivio strutture non valida.")
+    properties = data.get("properties")
+    if not isinstance(properties, list) or len(properties) != 1 or not isinstance(properties[0], dict):
+        raise ValueError("Configurazione strutture ambigua.")
+    record = properties[0]
+    if not isinstance(record.get("name"), str) or not 1 <= len(record["name"].strip()) <= 80:
+        raise ValueError("Nome struttura non valido.")
+    return require_property_id(record.get("id"))
+
+
+def require_record_scope(record: dict, property_id: str) -> dict:
+    """Reject another property's records and unscoped legacy records."""
+    if not belongs_to_property(record, property_id):
+        raise ValueError("Record non appartenente alla struttura.")
+    return record
