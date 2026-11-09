@@ -1,10 +1,12 @@
 # CL B&B Manager
 
-**Versione 0.5.0-alpha.6 — collaudo QR/PIN virtuale su LAN e HTTPS opzionale. Non per accessi reali in produzione.**
+**Versione 0.5.0-alpha.7 — migrazione sicura delle strutture, isolamento dei dati e collaudo QR/PIN solo virtuale. Non per accessi reali in produzione.**
 
 Integrazione custom per Home Assistant, progettata da CL Impianti per la gestione di varchi, camere e prenotazioni nei B&B.
 
 ## Funzioni oggi presenti
+
+La versione alpha.7 consolida la migrazione dell’archivio alla versione 3 e l’isolamento dei dati per struttura. L’impianto pilota usa ancora **una sola struttura per istanza Home Assistant**: la gestione simultanea di più B&B nello stesso archivio e il portale permanente restano funzionalità future.
 
 - **Pannello amministrativo** in Home Assistant con *Panoramica*, *Prenotazioni*, *Accessi*, *Varchi*, *Registro* e *Impostazioni*.
 - **Varchi dinamici**: aggiungi, configura, modifica e disabilita varchi comuni o privati; fino a 200 in questa alpha.
@@ -30,7 +32,7 @@ Gli script virtuali previsti sono `script.cl_bb_demo_apri_cancello`, `script.cl_
 ## Installazione tramite Home Assistant Marketplace / HACS (pilot)
 
 1. Aggiungi il repository GitHub pubblico `climpianti/CL-BB-Manager` come **repository personalizzato** di categoria **Integrazione** nel Marketplace/HACS. Il repository deve essere pubblico, oppure l'account GitHub connesso a HACS deve essere autorizzato a leggere il repository privato.
-2. Cerca **CL B&B Manager** tra le integrazioni personalizzate e installa la revisione `0.4.0-alpha.4`. Verifica la versione nell'apposito `manifest.json` prima di usare il componente.
+2. Cerca **CL B&B Manager** tra le integrazioni personalizzate e installa la revisione pubblicata più recente e verifica il numero versione nel `manifest.json`. Verifica la versione nell'apposito `manifest.json` prima di usare il componente.
 3. Prima di installare su un'istanza con altri sistemi attivi, salva e verifica un backup completo Home Assistant. Per attivare il componente occorre un riavvio di Home Assistant.
 4. In Home Assistant apri **Impostazioni → Dispositivi e servizi → Aggiungi integrazione → CL B&B Manager** e crea un'unica istanza; non duplicare una configurazione già presente.
 5. Per il collaudo usa soltanto script `script.cl_bb_demo_apri_*` verificati, collegati esclusivamente a helper `input_boolean` virtuali. Non collegare attuatori fisici.
@@ -89,3 +91,8 @@ Nel pannello **Collaudo accessi** il percorso **HTTPS esterno** è predefinito e
 
 
 **Branding CL Control:** il logo in testata e sulla pagina QR/PIN è il logo originale CL Impianti già usato in CL Control, distribuito come risorsa statica locale del componente. La versione BlueTech Glass mantiene colori e funzione di collaudo virtuale.
+
+
+## Stato collaudo e percorso beta
+
+Consulta [Checklist pre-beta](docs/BETA-READINESS.md) prima di distribuire questa versione. L’aggiornamento HACS si applica al riavvio Home Assistant. La scansione QR su smartphone e il flusso completo PIN valido → autorizzazione → impulso virtuale richiedono ancora una prova end-to-end in ambiente di test; non dichiararli verificati sulla base dei soli test unitari o di un impulso virtuale avviato manualmente.
