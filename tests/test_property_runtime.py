@@ -87,7 +87,8 @@ def test_new_record_and_authorization_wiring():
     assert 'gate["property_id"] = manager.property_id' in api
     assert 'booking["property_id"] = property_id' in api
     assert 'assert_gate_scope(manager.data["gates"], booking["gate_ids"], property_id)' in api
-    assert 'gate["property_id"] = manager.property_id' in flow
+    assert 'await async_add_shelly_gate(manager' in flow
+    assert 'property_id=manager.property_id' in (ROOT / "gate_setup.py").read_text()
     assert '"property_id": self.property_id' in manager
     assert 'def property_id(self)' in manager
     assert 'require_record_scope(record, property_id)' in manager
@@ -95,3 +96,4 @@ def test_new_record_and_authorization_wiring():
         assert "property_id=manager.property_id" in source
     for source in (demo, public, guest):
         assert "belongs_to_property" in source
+

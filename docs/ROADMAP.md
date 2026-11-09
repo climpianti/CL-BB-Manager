@@ -1,3 +1,5 @@
+> Documento storico delle release precedenti. Per installazione e stato attuali vedere [README](../README.md) e [PRODUCT-READINESS](PRODUCT-READINESS.md).
+
 # Roadmap CL B&B Manager
 
 ## 0.1 e 0.2 — completato
@@ -85,3 +87,4 @@ Architettura **local-first**: ogni installazione Home Assistant conserva localme
 
 ### Criteri di rilascio
 Nessuna funzionalità di apertura fisica abilitata di default; nessun merge senza CI verde; migrazioni con backup e test; test di isolamento multi-struttura e revisione di sicurezza prima della beta pubblica.
+

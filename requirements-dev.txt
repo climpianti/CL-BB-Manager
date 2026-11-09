@@ -1,3 +1,5 @@
 pytest>=8.0
 aiohttp>=3.11,<4
 voluptuous>=0.15,<1
+segno==1.6.6
+

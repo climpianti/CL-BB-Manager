@@ -1,3 +1,5 @@
+> Documento storico delle release precedenti. Per installazione e stato attuali vedere [README](../README.md) e [PRODUCT-READINESS](PRODUCT-READINESS.md).
+
 # Revisione tecnica del percorso QR fisico — 9 novembre 2026
 
 ## Ambito ed evidenze
@@ -29,3 +31,4 @@ Il codice attivo mantiene `PHYSICAL_RELEASE_ENABLED = False`. Il QR permanente p
 - [ ] Piano di ripristino e responsabilità operativa per la porta, nel rispetto della scelta dell'utente di non effettuare adesso un nuovo backup.
 
 **Esito:** preparazione e test software possibili, **attivazione fisica pubblica NON approvata**. La release alpha.14 resta deliberatamente con `PHYSICAL_RELEASE_ENABLED = False` e `hardware_control = disabled`; la revisione interna non sostituisce quella indipendente.
+

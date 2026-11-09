@@ -62,14 +62,16 @@ def test_operator_options_reopen_with_saved_selection():
     source = (ROOT / "config_flow.py").read_text(encoding="utf-8")
     assert 'operator_user_ids(self.config_entry.options)' in source
     assert 'OPTION_OPERATOR_USERS, default=list(previous)' in source
-    assert '"current_operators": names' in source
+    assert '"current_operators":' in source
     assert 'OPTION_OPERATOR_USERS: selected' in source
 
 
 def test_gate_created_disabled_and_options_kept_unchanged():
     source = (ROOT / "config_flow.py").read_text(encoding="utf-8")
-    assert 'user_input["action"], user_input["kind"], enabled=False' in source
-    assert 'self.hass.states.get(gate["entity_id"]) is None' in source
+    setup_source = (ROOT / "gate_setup.py").read_text()
+    assert 'await async_add_shelly_gate(manager' in source
+    assert '"switch.turn_on", kind, enabled=False' in setup_source
+    assert 'resolve_entity(manager.hass, entity_id)' in setup_source
     assert 'return self.async_create_entry(' in source
     assert 'data=self._unchanged_options()' in source
 
@@ -113,3 +115,4 @@ def test_websocket_gate_remapping_uses_booking_guard_and_invalidates_sessions():
     assert 'original["token"] = candidate["token"]' in source
     assert 'manager.demo_sessions.clear()' in source
     assert 'manager.public_demo_sessions.clear()' in source
+

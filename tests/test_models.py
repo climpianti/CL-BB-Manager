@@ -25,8 +25,11 @@ def test_pin_security():
 def test_gate_map():
     gate = make_gate("Camera 1", "script.cl_bb_demo_apri_camera_1", "script.turn_on")
     assert gate["enabled"] is False
+    relay = make_gate("Porta", "switch.foo", "switch.turn_on")
+    assert relay["enabled"] is False
+    assert "shelly_binding" not in relay  # Metadata alone grants no physical capability.
     with pytest.raises(ValueError):
-        make_gate("Abusivo", "switch.foo", "switch.turn_on")
+        make_gate("Abusivo", "switch.foo", "switch.toggle")
 
 
 def test_booking_access_and_revoke():
@@ -53,3 +56,4 @@ def test_naive_datetime_rejected():
     with pytest.raises(ValueError):
         make_booking("Camera 1", "2026-11-10T14:00:00",
                      "2026-11-11T10:00:00+01:00", ["a"], "12345678")
+

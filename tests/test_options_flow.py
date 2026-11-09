@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import importlib.util
 from pathlib import Path
 import sys
@@ -115,6 +116,18 @@ def setup(options=None):
         states=SimpleNamespace(get=lambda entity_id:
             SimpleNamespace(state="off") if entity_id.startswith("script.") else None),
     )
+    # Native registry/RPC-shaped doubles exercise actual setup, not a script stub.
+    from test_shelly_gate import Registry, NativeRpc, MAC, ENTITY
+    rpc = NativeRpc(); registry = Registry()
+    device = SimpleNamespace(model="Shelly 1 Mini Gen3")
+    native_entry = SimpleNamespace(domain="shelly", unique_id=MAC,
+        runtime_data=SimpleNamespace(rpc=SimpleNamespace(connected=True, device=rpc)))
+    hass.config_entries = SimpleNamespace(async_get_entry=lambda id: native_entry)
+    hass.states = SimpleNamespace(get=lambda entity_id: SimpleNamespace(state="off") if entity_id==ENTITY or entity_id.startswith("script.") else None)
+    manager.hass = hass
+    manager.physical_forms = {}
+    driver = importlib.import_module(PACKAGE + ".shelly_gate")
+    driver._registries = lambda h: (registry, SimpleNamespace(async_get=lambda id: device))
     flow = flow_module.CLBBManagerOptionsFlow()
     flow.hass = hass
     flow.config_entry = SimpleNamespace(options=options or {
@@ -175,8 +188,8 @@ def test_add_gate_is_disabled_and_duplicate_rejected():
     async def go():
         flow, manager = setup()
         gate_values = {
-            "name": "Cancello", "entity_id": "script.cancello",
-            "action": "script.turn_on", "kind": "shared",
+            "name": "Cancello", "entity_id": "switch.another_hotel_entrance",
+            "pulse_seconds": 2, "confirm": True, "kind": "shared",
         }
         created = await flow.async_step_add_gate(gate_values)
         assert created["type"] == "create_entry"
@@ -186,8 +199,8 @@ def test_add_gate_is_disabled_and_duplicate_rejected():
         assert manager.data["gates"][0]["enabled"] is False
         assert manager.data["gates"][0]["property_id"] == manager.property_id
         repeated = await flow.async_step_add_gate(gate_values)
-        assert repeated["type"] == "form"
-        assert repeated["errors"]["base"] == "invalid_gate"
+        assert repeated["type"] == "abort"
+        assert repeated["reason"] == "no_shelly"
         assert len(manager.data["gates"]) == 1
     asyncio.run(go())
 
@@ -196,8 +209,8 @@ def test_gate_deletion_requires_confirmation_and_respects_bookings():
     async def go():
         flow, manager = setup()
         await flow.async_step_add_gate({
-            "name": "Cancello", "entity_id": "script.cancello",
-            "action": "script.turn_on", "kind": "shared",
+            "name": "Cancello", "entity_id": "switch.another_hotel_entrance",
+            "pulse_seconds": 2, "confirm": True, "kind": "shared",
         })
         gate_id = manager.data["gates"][0]["id"]
         chosen = await flow.async_step_remove_gate({"gate_id": gate_id})
@@ -226,10 +239,11 @@ def test_nonexistent_gate_not_removed():
     async def go():
         flow, manager = setup()
         await flow.async_step_add_gate({
-            "name": "Scala", "entity_id": "script.scala",
-            "action": "script.turn_on", "kind": "shared",
+            "name": "Scala", "entity_id": "switch.another_hotel_entrance",
+            "pulse_seconds": 2, "confirm": True, "kind": "shared",
         })
         result = await flow.async_step_remove_gate({"gate_id": "wrong-id"})
         assert result["errors"]["base"] == "invalid_gate"
         assert len(manager.data["gates"]) == 1
     asyncio.run(go())
+

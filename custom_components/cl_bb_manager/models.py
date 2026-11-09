@@ -13,6 +13,7 @@ ALLOWED_ACTIONS = {
     "script.turn_on": "script",
     "button.press": "button",
     "lock.unlock": "lock",
+    "switch.turn_on": "switch",
 }
 
 
@@ -65,7 +66,7 @@ def make_gate(
     if not (1 <= len(name) <= 80):
         raise ValueError("Il nome del varco deve avere 1-80 caratteri.")
     if action not in ALLOWED_ACTIONS:
-        raise ValueError("Azione non ammessa: utilizzare script, button o lock.")
+        raise ValueError("Azione del varco non ammessa.")
     if not entity_id.startswith(ALLOWED_ACTIONS[action] + "."):
         raise ValueError("L'entità non corrisponde all'azione.")
     if kind not in ("shared", "private"):
@@ -97,7 +98,7 @@ def make_booking(
     if not gate_ids or len(gate_ids) != len(set(gate_ids)):
         raise ValueError("Selezionare varchi distinti.")
     if (ends - starts).days > 90:
-        raise ValueError("Per la demo, durata massima 90 giorni.")
+        raise ValueError("Durata massima della prenotazione: 90 giorni.")
     return {
         "id": str(uuid4()),
         "room": room.strip(),
@@ -123,3 +124,4 @@ def booking_allows(booking: dict, gate_id: str, now: datetime | None = None) -> 
 def public_booking(booking: dict) -> dict:
     """Remove all credential fields before returning to the manager."""
     return {k: v for k, v in booking.items() if k not in ("pin_salt", "pin_hash")}
+

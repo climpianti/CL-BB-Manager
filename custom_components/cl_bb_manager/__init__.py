@@ -1,7 +1,4 @@
-"""CL B&B Manager: admin panel and isolated short-lived LAN QR test sessions.
-
-The permanent guest portal is disabled. Only five demo virtual scripts can run.
-"""
+"""CL B&B Manager: reservations, operator permissions and permanent door access."""
 from __future__ import annotations
 
 import asyncio
@@ -15,10 +12,6 @@ from homeassistant.helpers.storage import Store
 
 from .api import register_commands
 from .access_history import public_access_history
-from .guest import GuestView
-from .demo_http import DemoPortalView
-from .public_http import PublicPilotView
-from .permanent_http import PermanentPilotView
 from .physical_http import PhysicalGuestView
 from .const import DOMAIN, MAX_EVENTS, PANEL_PATH, PANEL_RESOURCE, STORE_KEY
 from .models import public_booking
@@ -41,7 +34,7 @@ class BBManager:
         self.public_demo_sessions = {}
         # Volatile, one-use browser form proofs; QR gate tokens stay persisted.
         self.permanent_forms = {}
-        # Independent one-use forms; physical endpoint is build-time disabled.
+        # Independent one-use forms for the physical guest endpoint.
         self.physical_forms = {}
         self.data = {"gates": [], "bookings": [], "events": [], "access_history": []}
 
@@ -50,9 +43,8 @@ class BBManager:
         saved = await self.store.async_load()
         if saved is not None:
             self.data = saved
-        # Explicit single-property migration for the pilot installation.
+        # Single-property migration, also used to initialize an empty install.
         # The store is only written after a fully validated copy is prepared.
-        # No backup is created: this is restricted to the approved test pilot.
         if self.data.get("schema_version") != SCHEMA_VERSION:
             properties = self.data.get("properties", [])
             if properties:
@@ -120,6 +112,9 @@ class BBManager:
                 and gate.get("action") == "script.turn_on"
                 and gate.get("entity_id") in DEMO_SCRIPTS
             )
+            item["physical_qr_prepared"] = bool(gate.get("physical_token"))
+            item["physical_enabled"] = gate.get("physical_enabled") is True
+            item["provider"] = "shelly" if gate.get("shelly_binding") else "existing"
             if is_admin:
                 item.update({
                     key: gate[key] for key in ("entity_id", "action")
@@ -127,6 +122,13 @@ class BBManager:
                 item["hardware_candidate"] = read_candidate(gate)
                 item["physical_qr_prepared"] = bool(gate.get("physical_token"))
                 item["physical_enabled"] = gate.get("physical_enabled") is True
+                if gate.get("shelly_binding"):
+                    item["pulse_seconds"] = gate["shelly_binding"].get("pulse_seconds")
+                    from .shelly_gate import resolve_binding
+                    try:
+                        item["entity_id"] = resolve_binding(self.hass, gate["shelly_binding"]).entity_id
+                    except ValueError:
+                        pass
             gates.append(item)
         return {
             "structure": self.entry.data.get("structure_name", "B&B"),
@@ -135,6 +137,10 @@ class BBManager:
             "events": list(self.data["events"][-MAX_EVENTS:]) if is_admin else [],
             "access_history": public_access_history(self.data),
             "role": role,
+            "public_origin": self.hass.config.external_url
+                or self.entry.options.get("public_origin")
+                or self.entry.options.get("public_pilot_origin", ""),
+            "public_access_enabled": self.entry.options.get("public_access_enabled", True),
             "guest_portal": "disabled",
             "public_pilot": "enabled" if self.entry.options.get("public_pilot_enabled", False) else "disabled",
             "permanent_pilot": "enabled" if self.entry.options.get("permanent_pilot_enabled", False) else "disabled",
@@ -158,10 +164,8 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
             )
         ])
         register_commands(hass)
-        hass.http.register_view(GuestView())
-        hass.http.register_view(DemoPortalView())
-        hass.http.register_view(PublicPilotView())
-        hass.http.register_view(PermanentPilotView())
+        # Old test-only URLs are intentionally no longer published. Existing
+        # physical URLs retain the same path and stored credentials.
         hass.http.register_view(PhysicalGuestView())
         domain_data["routes_registered"] = True
 
@@ -170,9 +174,9 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         frontend_url_path=PANEL_PATH,
         webcomponent_name="cl-bb-manager-panel",
         module_url=PANEL_RESOURCE,
-        # Avoid advertising a panel that should only be reached by Core's
-        # per-user shortcut. All WebSocket actions enforce the operator ACL.
-        sidebar_title=None,
+        # Standalone installation: also reachable without CL Control Core.
+        # Each WS handler enforces the current operator/admin ACL server-side.
+        sidebar_title="CL B&B Manager",
         sidebar_icon="mdi:bed",
         require_admin=False,
     )
@@ -184,3 +188,4 @@ async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
     frontend.async_remove_panel(hass, PANEL_PATH, warn_if_unknown=False)
     hass.data.get(DOMAIN, {}).pop("manager", None)
     return True
+

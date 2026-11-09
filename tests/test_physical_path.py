@@ -199,3 +199,22 @@ def test_cooldown_rejects_corrupt_saved_timestamp(bad):
     data = {"physical_last_action": {"gate": bad}}
     assert physical_policy.take_cooldown(data, "gate", now=5000) is False
 
+
+
+@pytest.mark.parametrize(('script','relay'),[
+    ('script.cl_bb_porta_strada_impulso_locale','switch.porta_strada'),
+    ('script.cl_bb_porta_scala_impulso_locale','switch.porta_scale'),
+])
+def test_existing_strada_and_scala_qr_use_only_their_bound_fake_actuator(monkeypatch,script,relay):
+    async def check():
+        manager,hass=setup(monkeypatch)
+        gate=manager.data['gates'][0]
+        gate['hardware_candidate']['entity_id']=script
+        hass.states[script]=SimpleNamespace(state='off')
+        hass.states[relay]=SimpleNamespace(state='off')
+        request=await form(manager,hass)
+        response=await physical_http.PhysicalGuestView().post(request,TOKEN)
+        assert response.status==200
+        assert [call[2]['entity_id'] for call in hass.calls]==[script]
+        assert gate['physical_token']==TOKEN
+    asyncio.run(check())

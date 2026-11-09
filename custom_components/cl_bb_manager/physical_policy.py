@@ -20,9 +20,8 @@ from .property_scope import belongs_to_property
 PHYSICAL_RELEASE_ENABLED = True
 PHYSICAL_OPEN_COOLDOWN_SECONDS = 12
 
-# Explicitly reviewed actuator pairs for the single-property physical pilot.
-# Fail closed for any script that is not paired with its expected Shelly relay.
-# New installations require a separate, reviewed pairing/provisioning workflow.
+# Compatibility mappings for already installed doors and their printed QR.
+# New installations use the native Shelly commissioning workflow instead.
 PILOT_SCRIPT_RELAY = {
     "script.cl_bb_porta_strada_impulso_locale": "switch.porta_strada",
     "script.cl_bb_porta_scala_impulso_locale": "switch.porta_scale",
@@ -30,7 +29,7 @@ PILOT_SCRIPT_RELAY = {
 
 
 def physical_target(manager, gate: dict, hass, *, token: str | None = None):
-    """Only return a real script when EVERY independent guard succeeds."""
+    """Return the bound actuator only when every independent guard succeeds."""
     if not PHYSICAL_RELEASE_ENABLED:
         return None
     if manager.data.get("physical_access_enabled") is not True:
@@ -38,8 +37,6 @@ def physical_target(manager, gate: dict, hass, *, token: str | None = None):
     if not belongs_to_property(gate, manager.property_id):
         return None
     if gate.get("enabled") is not True or gate.get("physical_enabled") is not True:
-        return None
-    if gate.get("action") != "script.turn_on":
         return None
     physical_token = gate.get("physical_token")
     if (
@@ -55,6 +52,23 @@ def physical_target(manager, gate: dict, hass, *, token: str | None = None):
         return None
     # Deliberately separate from original demo entity and token.
     if physical_token == gate.get("token"):
+        return None
+    return ready_actuator(gate, hass)
+
+
+def ready_actuator(gate: dict, hass):
+    """Resolve a configured actuator without changing enablement or devices."""
+    if "shelly_binding" in gate:
+        from .shelly_gate import resolve_binding
+        if gate.get("action") != "switch.turn_on":
+            return None
+        try:
+            return resolve_binding(hass, gate["shelly_binding"]).entity_id
+        except (ValueError, TypeError, KeyError, AttributeError):
+            return None
+    # Compatibility only: existing printed QR and grants keep their mapping.
+    # New gates are commissioned by stable Shelly identity, not this table.
+    if gate.get("action") != "script.turn_on":
         return None
     candidate = read_candidate(gate)
     if not candidate or candidate["entity_id"] == gate.get("entity_id"):
@@ -108,3 +122,4 @@ def take_cooldown(data: dict, gate_id: str, *, now: float | None = None) -> bool
         return False
     prior[gate_id] = instant
     return True
+

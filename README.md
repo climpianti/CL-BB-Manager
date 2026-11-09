@@ -1,121 +1,56 @@
 # CL B&B Manager
 
-**Versione 0.5.0-alpha.10 — QR fisso stampabile HTTPS in primo piano; QR temporaneo separato e marcato non stampabile. Solo varchi virtuali.**
+Integrazione Home Assistant di CL Impianti per gestire prenotazioni, codici personali e QR permanenti delle porte. Un amministratore configura la struttura e i varchi; gli operatori espressamente abilitati gestiscono gli ospiti senza diventare amministratori di Home Assistant.
 
-Integrazione custom per Home Assistant, progettata da CL Impianti per la gestione di varchi, camere e prenotazioni nei B&B.
+**Versione in revisione: 0.6.0-beta.1.** L'interfaccia usa il flusso operativo del gestionale. Questa revisione introduce il driver Shelly nativo: prima della distribuzione ai clienti resta necessario il collaudo del driver su hardware e su un'installazione Home Assistant reale pulita. La suite automatica usa dispositivi simulati e non certifica il cablaggio dell'impianto.
 
-## Funzioni oggi presenti
+## Installazione su un nuovo Home Assistant
 
-La versione alpha.7 consolida la migrazione dell’archivio alla versione 3 e l’isolamento dei dati per struttura. L’impianto pilota usa ancora **una sola struttura per istanza Home Assistant**: la gestione simultanea di più B&B nello stesso archivio e il portale permanente restano funzionalità future.
+1. Collega lo Shelly alla rete e aggiungilo tramite l'integrazione **Shelly ufficiale** di Home Assistant. Il modello supportato da questa revisione è **Shelly 1 Mini Gen3**. Verifica che sia online, con uscita OFF e cablaggio adatto alla serratura.
+2. Installa questo repository come integrazione personalizzata in HACS, oppure copia `custom_components/cl_bb_manager` nella cartella `custom_components` di HA. È richiesto Home Assistant 2026.10 o successivo; riavvia Home Assistant.
+3. Da **Impostazioni → Dispositivi e servizi → Aggiungi integrazione → CL B&B Manager**, assegna il nome alla struttura. È supportata una struttura per istanza HA.
+4. Configura una volta l'indirizzo HTTPS esterno in **Impostazioni → Sistema → Rete**. Nelle opzioni di CL B&B Manager verifica **Accesso HTTPS e operatori**, l'abilitazione del portale e gli account autorizzati. Se HA non ha un URL esterno, puoi specificare l'origine HTTPS nelle opzioni dell'integrazione.
+5. Nel pannello **Varchi → Aggiungi varco Shelly → Cerca dispositivi**, seleziona il relè, nome, tipo di accesso e durata impulso (0,5–5 secondi). Conferma l'applicazione del profilo.
+6. Il componente configura e rilegge automaticamente il profilo del relè: avvio **OFF**, accensione automatica disabilitata, spegnimento automatico abilitato con la durata scelta. Prepara un QR permanente, salva il collegamento stabile al dispositivo e lascia il varco **inattivo**. Non serve creare script, helper, automazioni o YAML per ogni porta.
+7. Dopo la verifica dell'installatore, usa **Abilita accesso**. La conferma controlla nuovamente il profilo, senza inviare un'apertura. Da **QR delle porte** visualizza e scarica il QR da stampare.
 
-- **Pannello amministrativo** in Home Assistant con *Panoramica*, *Prenotazioni*, *Accessi*, *Varchi*, *Registro* e *Impostazioni*.
-- **Varchi dinamici**: aggiungi, configura, modifica e disabilita varchi comuni o privati; fino a 200 in questa alpha.
-- **Prenotazioni con PIN** numerico di 8 cifre: check-in, check-out, elenco di varchi autorizzati, revoca immediata e PIN salvato soltanto come hash salato.
-- **QR permanenti /guest/** non attivi. Nel pannello Varchi si accede ora alla generazione di un **QR prova (LAN)** temporaneo; non consegnare QR agli ospiti reali.
-- **QR di prova temporaneo (10 minuti)**, generato dall'amministratore per uno dei cinque varchi **virtuali** della demo e utilizzabile da smartphone collegato alla **stessa rete LAN** di Home Assistant, senza account HA.
-- **Portale di prova** con PIN di prenotazione, controllo su permessi, data, revoca, limiti di tentativi persistenti, registro delle azioni e comando esclusivamente virtuale.
-- **QR HTTPS temporaneo (opzionale)**: richiede un'attivazione amministrativa esplicita e un dominio HTTPS fissato nelle opzioni; token valido 10 minuti, monouso dopo l'apertura, solo script virtuali. Vedere [piano di collaudo HTTPS](docs/PUBLIC-HTTPS-PILOT.md).
+L'integrazione non configura Wi-Fi, credenziali Shelly, tunnel, DNS o Cloudflare e non modifica il comportamento dell'ingresso locale dello Shelly. Queste attività e la verifica elettrica restano parte dell'installazione. Il profilo automatico riguarda esclusivamente il relè scelto.
 
-## Collaudo da smartphone sulla rete locale
+## Uso da parte del gestore
 
-1. Collegati a Home Assistant con un account amministratore e apri **CL B&B Manager → Prenotazioni**. Crea una prenotazione di prova valida per l'ora corrente, con **Camera 1** tra i varchi autorizzati. Copia il PIN mostrato una sola volta.
-2. Apri **Collaudo accessi → QR temporaneo per smartphone** e seleziona **Camera 1**.
-3. Inserisci l'**indirizzo LAN di Home Assistant**, per esempio `http://192.168.1.100:8123` (sostituiscilo con quello reale) oppure un nome `*.local` risolto sulla rete.
-4. Genera il QR e scansionalo entro **10 minuti** da uno smartphone collegato alla **stessa LAN/Wi-Fi**.
-5. Inserisci il PIN corretto: il server controlla la prenotazione e simula l'apertura di Camera 1 mediante lo script virtuale `script.cl_bb_demo_apri_camera_1`.
-6. Verifica che PIN errati, scaduti, revocati o destinati ad altre camere siano rifiutati. Revoca la prenotazione di prova al termine.
+- **Prenotazioni:** scegli camera, date e porte autorizzate. Il codice viene mostrato una volta; nell'archivio resta un hash salato. Le autorizzazioni fisiche delle porte selezionate vengono associate nella stessa operazione.
+- **QR delle porte:** mostra e scarica il QR già esistente senza rigenerarlo. Il QR resta uguale tra prenotazioni e riavvii; il codice personale stabilisce chi può aprire e quando.
+- **Registro accessi:** mostra l'esito delle richieste. Un comando inviato non prova che la serratura si sia sbloccata: non viene inventato un feedback di apertura.
+- **Varchi e impostazioni:** riservati agli amministratori. Disattivare una porta conserva il QR; sostituirlo richiede una conferma esplicita e rende inutilizzabile la vecchia stampa. Il blocco di emergenza revoca QR e relativi permessi fisici.
 
-**Non utilizzare il nome di dominio Cloudflare, tunnel pubblici o indirizzi Internet per il QR demo.** Sono ammessi esclusivamente indirizzi RFC1918 o `*.local`. Il collegamento QR temporaneo e i dati di sessione scompaiono al riavvio di Home Assistant. I PIN restano validi solo finché la prenotazione lo consente.
+Il pannello compare direttamente nella barra laterale HA e non richiede CL Control. Gli amministratori hanno accesso; un account attivo non amministratore deve essere selezionato nelle opzioni dell'integrazione. Il backend verifica il ruolo per ogni richiesta: nascondere i pulsanti non è il controllo di sicurezza.
 
-Gli script virtuali previsti sono `script.cl_bb_demo_apri_cancello`, `script.cl_bb_demo_apri_portone`, `script.cl_bb_demo_apri_camera_1`, `script.cl_bb_demo_apri_camera_2` e `script.cl_bb_demo_apri_camera_3`, ciascuno collegato esclusivamente a un `input_boolean` dimostrativo.
+## Aggiornamento da Bausan / versioni precedenti
 
-## Installazione tramite Home Assistant Marketplace / HACS (pilot)
+L'aggiornamento conserva archivio, QR **fisici**, prenotazioni e stati di abilitazione già salvati; non abilita automaticamente porte o vecchie prenotazioni. Le associazioni esistenti Strada/Scala continuano a usare i due script già predisposti, come compatibilità. Il nuovo flusso nativo si applica ai nuovi varchi.
 
-1. Aggiungi il repository GitHub pubblico `climpianti/CL-BB-Manager` come **repository personalizzato** di categoria **Integrazione** nel Marketplace/HACS. Il repository deve essere pubblico, oppure l'account GitHub connesso a HACS deve essere autorizzato a leggere il repository privato.
-2. Cerca **CL B&B Manager** tra le integrazioni personalizzate e installa la revisione pubblicata più recente e verifica il numero versione nel `manifest.json`. Verifica la versione nell'apposito `manifest.json` prima di usare il componente.
-3. Prima di installare su un'istanza con altri sistemi attivi, salva e verifica un backup completo Home Assistant. Per attivare il componente occorre un riavvio di Home Assistant.
-4. In Home Assistant apri **Impostazioni → Dispositivi e servizi → Aggiungi integrazione → CL B&B Manager** e crea un'unica istanza; non duplicare una configurazione già presente.
-5. Per il collaudo usa soltanto script `script.cl_bb_demo_apri_*` verificati, collegati esclusivamente a helper `input_boolean` virtuali. Non collegare attuatori fisici.
+I percorsi di prova `/demo/`, `/public-demo/` e `/permanent-demo/` non vengono più registrati. I QR operativi usano esclusivamente `/api/cl_bb_manager/physical/…`. Un vecchio QR virtuale non viene convertito in una chiave fisica. Gli identificatori interni storici restano solo per leggere i dati esistenti e mantenere i test di regressione.
 
-Il Marketplace di Home Assistant 2026.11 può richiedere prima l'accettazione dell'avviso iniziale e la connessione dell'account GitHub. Per il piano Covone vedere [PILOT-COVONE.md](docs/PILOT-COVONE.md) sul [branch pilota](https://github.com/climpianti/CL-BB-Manager/tree/pilot/bb-covone-alpha4). In assenza di un rilascio stabile, la selezione della versione può corrispondere al branch principale; verificare sempre `manifest.json`.
+Il difetto degli operatori è corretto in `permissions.operator_user_ids`: le opzioni HA sono una `MappingProxyType`, ora accettata come `Mapping`. Non è necessario rendere amministratore l'utente selezionato. Il precedente fix HTTP 403 sul form PIN resta attivo: `Referrer-Policy: strict-origin`, controllo dell'origine, nonce monouso e rifiuto dei replay.
 
-**Alternativa manuale:** copia `custom_components/cl_bb_manager/` in `/config/custom_components/cl_bb_manager/`, valida la configurazione, riavvia e aggiungi l'integrazione dall'interfaccia.
+## Verifiche automatiche
 
-**Pubblicare questo repository su GitHub non attiva il portale permanente**: il percorso `/guest/` resta disattivato e il QR `/demo/` è utilizzabile solo sulla LAN. La nuova pagina `/public-demo/` è inattiva fino all'attivazione esplicita delle opzioni HTTPS da parte dell'amministratore.
-
-## Collaudo HTTPS temporaneo (opzionale)
-
-In **Impostazioni → Dispositivi e servizi → CL B&B Manager → Configura**, l'amministratore può attivare il test HTTPS e inserire il nome di dominio esatto (solo HTTPS). Nel pannello **Collaudo accessi** è possibile generare un QR esterno, temporaneo e monouso, per un solo varco virtuale. L'accesso richiede un PIN di prenotazione valido; l'endpoint permanente `/guest/` resta spento. La disattivazione nelle opzioni invalida immediatamente le sessioni. Non usare questa modalità per serrature reali.
-
-## Limiti importanti
-
-- **Il portale QR pubblico permanente è disattivato.** I QR temporanei LAN/HTTPS sono ambienti di collaudo con soli script virtuali, non un sistema di accesso per clienti.
-- Non è consentito l'uso con serrature o attuatori fisici; non collegare gli script virtuali a comandi hardware.
-- La verifica dell'interfaccia su smartphone e il test completo sul server reale sono richiesti prima di considerare completata la fase alpha.
-- Per un prodotto commerciale restano da implementare protezione del proxy HTTPS, sessioni ospiti di produzione, ruoli gestore/installatore, GDPR, backup, audit e fail-safe.
-
-## Interfaccia CL Control · BlueTech Glass
-
-Il pannello amministrativo e la pagina PIN/QR temporanea utilizzano il design system **CL Control Blue Tech Premium**, adattato in stile glassmorphism (blu notte `#061324`, ciano `#19baff`, verde `#32e394`), con card traslucide, interazioni accessibili e layout responsive.
-
-La navigazione del pannello comprende **Panoramica, Prenotazioni, Accessi, Varchi, Registro e Impostazioni**. Il collegamento HTTPS usa l'URL esterno configurato in Home Assistant; il QR locale rimane opzionale. La pagina ospite visualizza un form PIN più chiaro e messaggi di esito semplificati.
-
-**Nota di sicurezza:** le diciture orientate al cliente non trasformano questa release alpha in un sistema di apertura fisica. Sono consentite soltanto simulazioni tramite script virtuali. Il portale permanente `/guest/` continua a restituire 404. I PIN e i QR temporanei non devono essere condivisi pubblicamente.
-
-## Test
-
-```bash
+```sh
 python -m pip install -r requirements-dev.txt
 python -m pytest tests -q
-node --test tests/test_panel.mjs
+npm ci --ignore-scripts
+npm test
 node --check custom_components/cl_bb_manager/frontend/panel.js
 ```
 
-La pipeline GitHub Actions ripete i controlli a ogni push.
+I test coprono installazione vuota, configurazione Shelly senza apertura, controllo identità e profilo, operatore selezionato/non selezionato/revocato, prenotazione, QR, GET/POST PIN, replay e riavvio con archivio persistente. Le prove di apertura usano esclusivamente RPC fittizie.
 
-Repository pubblico per collaudo; licenza non ancora definita. Consulta [Roadmap](docs/ROADMAP.md) e [Sicurezza](docs/SECURITY.md).
+È disponibile anche un controllo Chromium isolato in `tests/browser_product_smoke.cjs`. Con `playwright-core` e Chromium già installati:
 
-## Impostazioni e varchi (0.5.0-alpha.6)
+```sh
+CL_BB_CHROMIUM_PATH=/percorso/chromium node tests/browser_product_smoke.cjs
+```
 
-Da **Home Assistant → Impostazioni → Dispositivi e servizi → CL B&B Manager → Configura** si apre un menu con:
+In alternativa si può indicare il modulo con `CL_BB_PLAYWRIGHT_MODULE`; `CL_BB_SCREENSHOT_DIR` abilita screenshot locali. Ogni richiesta del browser è intercettata e servita da fixture locali. Il controllo visita tutte le schede per amministratore e operatore, a 390 e 1366 pixel.
 
-- **Accesso HTTPS e operatori**: mostra i nomi degli operatori già salvati, preseleziona i relativi account Home Assistant quando riapri la pagina e permette di aggiornarne l'elenco (massimo 20 utenti non amministratori attivi). Gli amministratori hanno già accesso senza selezione. Gli operatori non possono modificare le configurazioni dei varchi.
-- **Gestione varchi → Aggiungi varco**: seleziona un'entità Home Assistant esistente (script/button/lock), indica l'azione coerente e il tipo. Il nuovo varco è sempre creato **disattivato**, per verifica e successiva abilitazione dal pannello amministrativo.
-- **Gestione varchi → Elimina varco**: seleziona un varco esistente e conferma in una seconda schermata. Il server impedisce la rimozione finché sono associate prenotazioni non revocate e non scadute. Il comando elimina solo la mappatura nel gestionale; **non elimina le entità Home Assistant né comanda dispositivi**.
-
-Le modifiche sono applicate alla configurazione dell'integrazione e allo storage gestito da HA; non modificano PIN o token in chiaro. La modalità di accesso pubblico permanente resta disattivata e l'apertura è consentita solo ai cinque script virtuali approvati nel pilot.
-
-## Scelta automatica dell'indirizzo QR
-
-Nel pannello **Collaudo accessi** il percorso **HTTPS esterno** è predefinito e usa automaticamente l'URL esterno configurato in **Home Assistant → Impostazioni → Sistema → Rete**. Il backend valida l'URL HTTPS di HA e genera link solo per il portale temporaneo `/public-demo/`, se il collaudo pubblico è stato esplicitamente abilitato nelle opzioni dell'integrazione. La modalità **LAN / Wi-Fi locale** resta selezionabile per i test locali e legge, se presente, l'URL interno configurato in Home Assistant; altrimenti l'indirizzo LAN può essere inserito manualmente. Le due modalità non sono intercambiabili e il percorso permanente `/guest/` resta disabilitato.
-
-
-**Branding CL Control:** il logo in testata e sulla pagina QR/PIN è il logo originale CL Impianti già usato in CL Control, distribuito come risorsa statica locale del componente. La versione BlueTech Glass mantiene colori e funzione di collaudo virtuale.
-
-
-## Stato collaudo e percorso beta
-
-Consulta [Checklist pre-beta](docs/BETA-READINESS.md) prima di distribuire questa versione. L’aggiornamento HACS si applica al riavvio Home Assistant. La scansione QR su smartphone e il flusso completo PIN valido → autorizzazione → impulso virtuale richiedono ancora una prova end-to-end in ambiente di test; non dichiararli verificati sulla base dei soli test unitari o di un impulso virtuale avviato manualmente.
-
-
-## QR permanente stampabile · pilota virtuale (alpha.8)
-
-Nelle **opzioni dell'integrazione** attiva esplicitamente **QR permanente solo varchi virtuali**, con un dominio HTTPS pubblico valido. Nella scheda **Accessi → Connessione → Accesso da Internet**, l'amministratore seleziona il varco, genera/visualizza il QR fisso, e scarica l'SVG da stampare. Il QR contiene il token persistente del varco, **non contiene il PIN** e resta uguale tra prenotazioni, riavvii e rigenerazioni. Ogni richiesta richiede una sessione web temporanea, il PIN valido e una prenotazione che autorizzi quel varco nel periodo selezionato.
-
-**Revoca QR:** con **Revoca QR e genera un nuovo codice** un amministratore può invalidare il QR stampato; sarà necessario sostituirlo sulla porta. Cambiare la mappatura del varco invalida automaticamente il QR precedente. Disabilitare il pilot rende il percorso non disponibile. I QR permanenti non sono monouso, ma i moduli web di verifica lo sono. Non utilizzare questa funzione su serrature o attuatori fisici: il server accetta soltanto i cinque script dimostrativi. Il portale legacy `/guest/` resta inattivo.
-
-**Stato:** implementazione virtuale sperimentale. Richiede test CI, collaudo HTTPS/reverse proxy da smartphone e revisione indipendente prima dell'esposizione a ospiti reali.
-
-
-### Quale QR stampare (alpha.9)
-
-Nella scheda **Accessi → Accesso da Internet** il riquadro **QR permanente stampabile · varchi virtuali** viene prima del riquadro **QR temporaneo · HTTPS · 10 minuti**. Il secondo continua a esistere solo per le prove a scadenza, e **non deve essere stampato**. Se il pannello permanente indica che è disabilitato, aprire **Impostazioni → Dispositivi e servizi → CL B&B Manager → Configura → Accesso HTTPS e operatori** e attivare la relativa opzione. Questa attivazione è **esplicita** e non viene abilitata automaticamente dall'aggiornamento.
-
-Se un QR temporaneo mostra `404 Not Found` dopo la scansione, verificare prima che non sia stato utilizzato o scaduto (10 minuti) e che si stia aprendo il dominio HTTPS configurato. Per i QR fissi il percorso è `/api/cl_bb_manager/permanent-demo/…`, diverso da `/api/cl_bb_manager/public-demo/…` usato dai QR monouso. Se un QR permanente presenta un 404, controllare l'opzione di abilitazione, il varco virtuale e il proxy HTTPS prima di dichiararlo funzionante. Non incollare il QR all'esterno su una porta fisica durante l'alpha.
-
-
-## Predisposizione Shelly reali (alpha.10, solo staging)
-
-L'amministratore può registrare uno script reale come **candidato hardware** di un varco tramite WebSocket `cl_bb_manager/stage_hardware_gate` con `gate_id` e `script_id`. L'operazione salva esclusivamente metadati non eseguibili e non cambia la mappatura del varco, il QR stampato, le prenotazioni o gli accessi. Solo l'amministratore vede la predisposizione nella scheda Varchi; `cl_bb_manager/clear_hardware_gate` elimina il candidato. Gli script candidati devono essere disponibili in Home Assistant e differenti da quelli virtuali. Non c'è alcun servizio nel QR pubblico che richiami un candidato hardware. `hardware_control: disabled` rimane invariato.
-
-**Per il pilota Bausan:** il varco Strada potrà essere associato a `script.cl_bb_porta_strada_impulso_locale`, Scala a `script.cl_bb_porta_scala_impulso_locale`. Questi script sono stati già testati manualmente e l'utente ha confermato lo scatto dei due dispositivi; ciò **non sostituisce** i test di sicurezza del percorso QR/PIN pubblico. La connessione definitiva al comando fisico resta bloccata fino alla verifica indipendente dei controlli HTTPS, PIN, brute-force, revoca, replay, disponibilità e log.
+Vedi [verifica della trasformazione](docs/PRODUCT-READINESS.md) per evidenze, limiti e collaudo prima dell'installazione reale. La documentazione delle vecchie release è materiale storico, non la procedura di installazione corrente.
