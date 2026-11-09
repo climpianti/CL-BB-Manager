@@ -20,6 +20,8 @@ from .demo_http import DemoPortalView
 from .public_http import PublicPilotView
 from .const import DOMAIN, MAX_EVENTS, PANEL_PATH, PANEL_RESOURCE, STORE_KEY
 from .models import public_booking
+from .property_migration import migrate_legacy_data, SCHEMA_VERSION
+from .property_scope import new_property, require_property_id
 
 
 class BBManager:
@@ -41,6 +43,25 @@ class BBManager:
         saved = await self.store.async_load()
         if saved is not None:
             self.data = saved
+        # Explicit single-property migration for the pilot installation.
+        # The store is only written after a fully validated copy is prepared.
+        # No backup is created: this is restricted to the approved test pilot.
+        if self.data.get("schema_version") != SCHEMA_VERSION:
+            properties = self.data.get("properties", [])
+            if properties:
+                if not isinstance(properties, list) or len(properties) != 1:
+                    raise ValueError("Archivio multi-struttura ambiguo.")
+                property_id = require_property_id(properties[0]["id"])
+            else:
+                property_id = new_property(
+                    self.entry.data.get("structure_name", "B&B")
+                )["id"]
+            migrated = migrate_legacy_data(
+                self.data, property_id,
+                self.entry.data.get("structure_name", "B&B"),
+            )
+            await self.store.async_save(migrated)
+            self.data = migrated
         for key in ("gates", "bookings", "events", "access_history"):
             self.data.setdefault(key, [])
 
