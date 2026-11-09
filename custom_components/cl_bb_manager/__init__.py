@@ -19,6 +19,7 @@ from .guest import GuestView
 from .demo_http import DemoPortalView
 from .public_http import PublicPilotView
 from .permanent_http import PermanentPilotView
+from .physical_http import PhysicalGuestView
 from .const import DOMAIN, MAX_EVENTS, PANEL_PATH, PANEL_RESOURCE, STORE_KEY
 from .models import public_booking
 from .hardware_staging import read_candidate
@@ -40,6 +41,8 @@ class BBManager:
         self.public_demo_sessions = {}
         # Volatile, one-use browser form proofs; QR gate tokens stay persisted.
         self.permanent_forms = {}
+        # Independent one-use forms; physical endpoint is build-time disabled.
+        self.physical_forms = {}
         self.data = {"gates": [], "bookings": [], "events": [], "access_history": []}
 
     async def async_load(self):
@@ -157,6 +160,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         hass.http.register_view(DemoPortalView())
         hass.http.register_view(PublicPilotView())
         hass.http.register_view(PermanentPilotView())
+        hass.http.register_view(PhysicalGuestView())
         domain_data["routes_registered"] = True
 
     await panel_custom.async_register_panel(
