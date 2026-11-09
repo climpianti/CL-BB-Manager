@@ -12,6 +12,7 @@ import voluptuous as vol
 from .const import DOMAIN, MAX_BOOKINGS, MAX_GATES
 from .models import as_utc, generate_pin, make_booking, make_gate, pin_matches
 from .gate_management import check_gate_removal
+from .physical_admin import invalidate_gate_physical_credentials
 from .permissions import user_role
 from .property_scope import assert_gate_scope, require_record_scope
 from .security import charge_attempt, demo_target_allowed, candidate_bookings
@@ -135,6 +136,7 @@ def register_commands(hass):
                 })
                 if sensitive_change:
                     # Mapping changes require deliberate re-enabling and revoke old QR sessions.
+                    invalidate_gate_physical_credentials(manager, original["id"])
                     original["token"] = candidate["token"]
                     manager.demo_sessions.clear()
                     manager.public_demo_sessions.clear()
@@ -166,6 +168,7 @@ def register_commands(hass):
                 require_record_scope(gate, manager.property_id)
                 check_gate_removal(gate["id"], manager.data["bookings"])
                 manager.permanent_forms.clear()
+                invalidate_gate_physical_credentials(manager, gate["id"])
                 manager.data["gates"].remove(gate)
                 manager.audit("gate_removed", gate["name"])
                 await manager.async_save()
@@ -522,6 +525,7 @@ def register_commands(hass):
                     for other in manager.data["gates"]
                 ):
                     raise ValueError("Script già proposto per un altro varco.")
+                invalidate_gate_physical_credentials(manager, gate["id"])
                 gate[FIELD] = candidate
                 manager.audit("hardware_candidate_staged", gate["id"])
                 await manager.async_save()
@@ -549,6 +553,7 @@ def register_commands(hass):
                 ]
                 if len(matching) != 1:
                     raise ValueError("Varco non disponibile.")
+                invalidate_gate_physical_credentials(manager, matching[0]["id"])
                 clear_candidate(matching[0], manager.property_id)
                 manager.audit("hardware_candidate_cleared", msg["gate_id"])
                 await manager.async_save()
@@ -661,6 +666,9 @@ def register_commands(hass):
             })
         except (ValueError, TypeError) as err:
             _error(connection, msg, err)
+
+    from .physical_admin import register_physical_admin_commands
+    register_physical_admin_commands(hass, _authorize, _summary, _error)
 
     for handler in (
         get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin, demo_qr, public_pilot_qr, permanent_pilot_qr, rotate_permanent_qr, stage_hardware_gate, clear_hardware_gate, hardware_preflight_report

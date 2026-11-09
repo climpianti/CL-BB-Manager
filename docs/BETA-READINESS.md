@@ -81,3 +81,27 @@ Mocked end-to-end tests verify default unavailability, distinct tokens, missing 
 - [ ] Define administrative approval and instant disable/rollback operation; do not expose an unreviewed enable endpoint.
 - [ ] Verify how an accepted Home Assistant service call is confirmed by a physical door sensor, or present its uncertainty explicitly.
 - [ ] Only after the above: release a separate, reviewed production build that intentionally enables the physical route and provisions new tokens; no existing printed demo QR should become a physical key automatically.
+
+
+## Alpha.15 dormant physical QR administration
+
+Admin-only WebSocket operations have been added for **staging only**:
+`prepare_physical_qr` (new, unrelated opaque token per gate; returns an admin-only QR),
+`grant_physical_booking` (explicit scope on an already valid booking),
+`revoke_physical_booking` and `emergency_disable_physical`
+(global disable, all physical QR tokens invalidated and explicit grants revoked).
+Any hardware candidate re-staging, removal or sensitive gate mapping change
+also invalidates the corresponding physical token and grants.
+
+**Important:** neither preparation nor the emergency command lifts the
+compile-time `PHYSICAL_RELEASE_ENABLED = False` guard, and the preparation
+command sets `physical_enabled = False` on the gate. Existing permanent-demo
+QR URLs and guest booking access remain virtual-only. Alpha.15 includes no
+arming operation and must not be described as physical QR production access.
+
+Before an activation-capable release, require independent review of network
+edge and host headers, a clear and independently tested administrative
+arming/disarming procedure, explicit per-gate physical consent, a dedicated
+test reservation and real smartphone-to-Shelly supervised acceptance.
+Do not distribute dormant physical URLs to guests. The operator chose not to
+create an additional Home Assistant backup during this pilot.
