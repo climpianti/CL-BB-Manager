@@ -21,7 +21,7 @@ from .public_http import PublicPilotView
 from .const import DOMAIN, MAX_EVENTS, PANEL_PATH, PANEL_RESOURCE, STORE_KEY
 from .models import public_booking
 from .property_migration import migrate_legacy_data, SCHEMA_VERSION
-from .property_scope import new_property, require_property_id
+from .property_scope import active_property_id, new_property, require_property_id, require_record_scope
 
 
 class BBManager:
@@ -64,6 +64,19 @@ class BBManager:
             self.data = migrated
         for key in ("gates", "bookings", "events", "access_history"):
             self.data.setdefault(key, [])
+        # An already migrated v2 store is not rewritten implicitly.
+        # Invalid ownership is rejected before exposing any access endpoint.
+        property_id = self.property_id
+        for key in ("gates", "bookings", "events", "access_history"):
+            if not isinstance(self.data[key], list):
+                raise ValueError("Archivio strutture corrotto.")
+            for record in self.data[key]:
+                require_record_scope(record, property_id)
+
+    @property
+    def property_id(self) -> str:
+        """The trusted server-side property identifier."""
+        return active_property_id(self.data)
 
     async def async_save(self):
         """Persist a completed mutation; call while holding lock."""
@@ -75,6 +88,7 @@ class BBManager:
             "at": datetime.now(timezone.utc).isoformat(),
             "event": event,
             "details": details[:160],
+            "property_id": self.property_id,
         })
         self.data["events"] = self.data["events"][-MAX_EVENTS:]
 
@@ -82,6 +96,10 @@ class BBManager:
         """Return minimal panel data with booking-scoped access history."""
         from .guest import DEMO_SCRIPTS
 
+        property_id = self.property_id
+        for key in ("gates", "bookings", "events", "access_history"):
+            for record in self.data[key]:
+                require_record_scope(record, property_id)
         is_admin = role == "admin"
         gates = []
         for gate in self.data["gates"]:
