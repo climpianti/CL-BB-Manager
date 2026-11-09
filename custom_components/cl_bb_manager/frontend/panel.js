@@ -21,9 +21,9 @@ class ClBbManagerPanel extends HTMLElement {
  go(tab){this.tab=tab;this.pin="";this.qr=null;this.render();}
  armed(gate){return gate.physical_enabled && this.data.hardware_control==="enabled";}
  render(){
-  const root=this.shadowRoot;root.replaceChildren();const style=this.node("style");style.textContent="@import url('/cl_bb_manager_static/bluetech-glass.css?v=0.6.0-beta.2');";root.append(style);
+  const root=this.shadowRoot;root.replaceChildren();const style=this.node("style");style.textContent="@import url('/cl_bb_manager_static/bluetech-glass.css?v=0.6.0-beta.3');";root.append(style);
   const page=this.node("main","","page"),hero=this.node("header","","hero");root.append(page);
-  const brand=this.node("div","","hero-brand"),logo=this.node("img");logo.src="/cl_bb_manager_static/cl-impianti-logo.svg?v=0.6.0-beta.2";logo.alt="CL Impianti";logo.className="brand-logo";brand.append(logo);
+  const brand=this.node("div","","hero-brand"),logo=this.node("img");logo.src="/cl_bb_manager_static/cl-impianti-logo.svg?v=0.6.0-beta.3";logo.alt="CL Impianti";logo.className="brand-logo";brand.append(logo);
   const word=this.node("span","","brand-word");word.append(this.node("strong","CL B&B MANAGER"),this.node("small","Gestione struttura e accessi"));brand.append(word);
   hero.append(brand,this.node("h1",this.data?.structure||"CL B&B Manager"),this.node("p","Prenotazioni, codici personali e accessi alla struttura","subtitle"));page.append(hero);
   if(this.error){const note=this.node("div",this.error,"notice");note.setAttribute("role","alert");page.append(note);}

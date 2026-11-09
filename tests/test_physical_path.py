@@ -87,7 +87,8 @@ def test_hypothetical_authorized_flow_is_once_only_with_cooldown(monkeypatch):
         request = await form(manager, hass)
         result = await physical_http.PhysicalGuestView().post(request, TOKEN)
         assert result.status == 200
-        assert "non conferma" in result.text
+        assert "Richiesta inviata" in result.text
+        assert "Porta aperta" not in result.text
         assert [call[2]["entity_id"] for call in hass.calls] == [REAL]
         assert (await physical_http.PhysicalGuestView().post(request, TOKEN)).status == 403
         assert len(hass.calls) == 1

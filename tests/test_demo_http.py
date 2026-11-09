@@ -146,7 +146,7 @@ def test_valid_pin_simulates_only_allowlisted_virtual_script():
         assert "Camera 1" in response.text
         result = await demo_http.DemoPortalView().post(request, token)
         assert result.status == 200
-        assert "Richiesta completata" in result.text
+        assert "Richiesta inviata" in result.text
         assert "name='pin'" not in result.text
         assert len(hass.calls) == 1
         assert hass.calls[0][0:3] == (
