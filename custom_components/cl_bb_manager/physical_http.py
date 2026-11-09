@@ -12,6 +12,7 @@ from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 
 from .const import DOMAIN
+from .access_history import add_access_event
 from .demo_http import _response
 from .models import pin_matches
 from .permanent_policy import consume_form, issue_form
@@ -126,6 +127,7 @@ class PhysicalGuestView(HomeAssistantView):
                         break
             if matched is None:
                 manager.audit("physical_denied", gate["id"])
+                add_access_event(manager.data, source="https", result="denied", gate=gate)
                 await manager.async_save()
                 return _response(gate["name"], "Codice non valido o non autorizzato.", 403, physical=True)
 
@@ -147,6 +149,10 @@ class PhysicalGuestView(HomeAssistantView):
                 await manager.async_save()
                 raise web.HTTPServiceUnavailable() from exc
             manager.audit("physical_command_sent", gate["id"])
+            add_access_event(
+                manager.data, source="https", result="authorized",
+                gate=gate, booking=matched,
+            )
             await manager.async_save()
         # HA service completion does not prove that an actual door unlocked.
         return _response(
