@@ -15,6 +15,7 @@ from .access_history import public_access_history
 from .physical_http import PhysicalGuestView
 from .const import DOMAIN, MAX_EVENTS, PANEL_PATH, PANEL_RESOURCE, STORE_KEY
 from .models import public_booking
+from .qr_branding import branding_status
 from .hardware_staging import read_candidate
 from .property_migration import migrate_legacy_data, SCHEMA_VERSION
 from .property_scope import active_property_id, new_property, require_property_id, require_record_scope
@@ -140,6 +141,7 @@ class BBManager:
                     item["recovery_pending"] = gate["id"] in self.data.get("pending_entity_pulses", {})
             gates.append(item)
         return {
+            **({"qr_branding": branding_status(self.data, preview=True)} if is_admin else {}),
             "structure": self.entry.data.get("structure_name", "B&B"),
             "gates": gates,
             "bookings": [public_booking(b) for b in self.data["bookings"]],

@@ -281,3 +281,50 @@ def test_generic_operator_booking_to_real_http_handlers_uses_only_selected_fake_
             replay=await client.post(path,data={'pin':generated,'form_csrf':nonce},headers=headers)
             assert replay.status==403 and len(hass.services.calls)==len(expected)
     asyncio.run(run())
+
+
+def test_logo_qr_download_survives_restart_preserves_tokens_and_operator_acl(monkeypatch):
+    async def run():
+        import base64
+        from io import BytesIO
+        from PIL import Image
+        import zxingcpp
+        from test_qr_branding import image_bytes
+        module,hass,entry,handlers,views,panels,rpc,registry=harness(monkeypatch)
+        await module.async_setup_entry(hass,entry)
+        manager=hass.data['cl_bb_manager']['manager'];admin=Connection();operator=Connection('selected-operator',False)
+        await call(handlers,'add_shelly_gate',hass,admin,name='Entrance',entity_id=native.ENTITY,pulse_seconds=2,kind='shared',confirm=True)
+        gate=manager.data['gates'][0];before=deepcopy(gate)
+        driver=importlib.import_module(module.__name__+'.qr_branding')
+        logo=driver.normalize_logo(image_bytes())
+        monkeypatch.setattr(driver,'consume_upload',lambda *args:logo)
+        await driver.async_update_branding(manager,enabled=True,file_id='native-upload')
+        assert gate==before
+        await call(handlers,'get_list',hass,operator)
+        assert 'qr_branding' not in operator.result
+        await call(handlers,'get_list',hass,admin)
+        assert admin.result['qr_branding']['enabled'] and admin.result['qr_branding']['preview'].startswith('data:image/png;base64,')
+        await call(handlers,'physical_qr',hass,operator,gate_id=gate['id'])
+        assert not operator.errors and operator.result['logo_applied']
+        original=operator.result
+        decoded=zxingcpp.read_barcode(Image.open(BytesIO(base64.b64decode(original['png_base64']))))
+        assert decoded.text==original['url'] and decoded.text.endswith(gate['physical_token'])
+        assert gate==before and not gate['physical_enabled']
+        # The explicit rotation operation also applies the saved logo, still inactive.
+        await call(handlers,'prepare_physical_qr',hass,operator,gate_id=gate['id'],confirm=True)
+        assert operator.errors and gate==before
+        await module.async_unload_entry(hass,entry);await module.async_setup_entry(hass,entry)
+        manager=hass.data['cl_bb_manager']['manager']
+        assert manager.data['gates'][0]==before
+        await call(handlers,'physical_qr',hass,operator,gate_id=gate['id'])
+        assert operator.result['logo_applied'] and operator.result['url']==original['url']
+        await call(handlers,'prepare_physical_qr',hass,admin,gate_id=gate['id'],confirm=True)
+        assert not admin.errors and admin.result['logo_applied']
+        assert manager.data['gates'][0]['physical_token']!=before['physical_token']
+        before=deepcopy(manager.data['gates'][0])
+        # Rendering failures cannot rotate an existing printed token.
+        manager.data['qr_branding']['logo']['png_base64']='invalid'
+        await call(handlers,'prepare_physical_qr',hass,admin,gate_id=gate['id'],confirm=True)
+        assert admin.errors and manager.data['gates'][0]==before
+        assert not any(method=='Switch.Set' for method,_ in rpc.calls)
+    asyncio.run(run())

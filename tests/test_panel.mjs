@@ -125,3 +125,21 @@ test("Generic relay requires explicit local-timer confirmation when selected",as
  form.dispatchEvent(new panel.ownerDocument.defaultView.Event("submit",{cancelable:true}));await settle();
  assert.match(form.textContent,/Conferma che il timer locale/);assert.ok(!calls.some(r=>r.type==="cl_bb_manager/add_entity_gate"));
 });
+
+test("Admin settings show the configured QR logo and native configuration path",async()=>{
+ const data=snapshot();data.qr_branding={enabled:true,has_logo:true,preview:'data:image/png;base64,cHJldmlldw=='};
+ const {panel,hass}=setup(data);panel.hass=hass;await settle();panel.go('impostazioni');
+ assert.match(panel.shadowRoot.querySelector('main').textContent,/Logo attivo/);
+ assert.match(panel.shadowRoot.querySelector('main').textContent,/Configura → Logo nei QR/);
+ assert.equal(panel.shadowRoot.querySelector('img[alt="Logo configurato per i QR"]').src,data.qr_branding.preview);
+});
+
+test("Operators can download branded QR artwork in both PNG and SVG without rotating it",async()=>{
+ const {panel,hass,calls}=setup(snapshot('operator'));
+ const call=hass.callWS;hass.callWS=async request=>request.type==='cl_bb_manager/physical_qr'?{gate_id:'door-a',svg:'<svg/>',png_base64:'cG5n',logo_applied:true}:call(request);
+ panel.hass=hass;await settle();panel.go('accessi');button(panel,'Mostra / scarica QR').click();await settle();
+ const links=[...panel.shadowRoot.querySelectorAll('a[download]')];
+ assert.equal(links.length,2);assert.ok(links.some(a=>a.download.endsWith('.png')));assert.ok(links.some(a=>a.download.endsWith('.svg')));
+ assert.equal(panel.shadowRoot.querySelector('.qr-print img').src,'data:image/png;base64,cG5n');
+ assert.ok(!calls.some(r=>/prepare|arm|open/.test(r.type)));
+});

@@ -55,6 +55,8 @@ helpers = ModuleType("homeassistant.helpers")
 selector = ModuleType("homeassistant.helpers.selector")
 selector.SelectSelector = DummySelector
 selector.EntitySelector = DummySelector
+selector.FileSelector = DummySelector
+selector.FileSelectorConfig = SelectorConfig
 selector.SelectSelectorConfig = SelectorConfig
 selector.EntitySelectorConfig = SelectorConfig
 selector.SelectOptionDict = lambda **kwargs: kwargs
@@ -142,7 +144,7 @@ def test_reopening_options_shows_saved_operator_and_name():
     async def go():
         flow, _ = setup()
         menu = await flow.async_step_init()
-        assert menu["menu_options"] == ["access", "gates"]
+        assert menu["menu_options"] == ["access", "gates", "qr_branding"]
         form = await flow.async_step_access()
         assert form["description_placeholders"]["current_operators"] == "Operatore A"
         schema = form["data_schema"].schema
@@ -265,4 +267,29 @@ def test_add_menu_and_generic_lock_options_without_device_commands(monkeypatch):
         assert result['type']=='create_entry' and len(manager.data['gates'])==1
         assert manager.data['gates'][0]['action']=='lock.unlock'
         assert not hass.services.calls
+    asyncio.run(run())
+
+
+def test_qr_logo_options_native_upload_preserves_other_options(monkeypatch):
+    async def run():
+        from test_qr_branding import image_bytes
+        flow,manager=setup()
+        driver=importlib.import_module(PACKAGE+'.qr_branding')
+        logo=driver.normalize_logo(image_bytes())
+        captured=[]
+        def consume(hass,file_id):captured.append(file_id);return logo
+        monkeypatch.setattr(driver,'consume_upload',consume)
+        async def executor(fn,*args):return fn(*args)
+        flow.hass.async_add_executor_job=executor
+        form=await flow.async_step_qr_branding()
+        assert form['step_id']=='qr_branding'
+        assert any(k.schema=='logo' for k in form['data_schema'].schema)
+        before=dict(flow.config_entry.options)
+        result=await flow.async_step_qr_branding({'enabled':True,'logo':'uploaded-file-id','remove_logo':False})
+        assert result['type']=='create_entry' and result['data']==before
+        assert captured==['uploaded-file-id'] and manager.data['qr_branding']['enabled']
+        assert manager.data['qr_branding']['logo']==logo
+        result=await flow.async_step_qr_branding({'enabled':False})
+        assert result['type']=='create_entry' and manager.data['qr_branding']['logo']==logo
+        assert not manager.data['qr_branding']['enabled']
     asyncio.run(run())
