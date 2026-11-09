@@ -56,7 +56,7 @@ def assert_gate_scope(
 
 def active_property_id(data: dict) -> str:
     """Return the only configured property; reject ambiguous/corrupt stores."""
-    if not isinstance(data, dict) or type(data.get("schema_version")) is not int or data["schema_version"] != 2:
+    if not isinstance(data, dict) or type(data.get("schema_version")) is not int or data["schema_version"] != 3:
         raise ValueError("Versione archivio strutture non valida.")
     properties = data.get("properties")
     if not isinstance(properties, list) or len(properties) != 1 or not isinstance(properties[0], dict):
