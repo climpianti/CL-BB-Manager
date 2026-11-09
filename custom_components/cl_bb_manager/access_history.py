@@ -8,6 +8,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from .property_scope import require_property_id
+
 MAX_ACCESS_EVENTS = 1000
 ACCESS_HISTORY_DAYS = 90
 ACCESS_SOURCES = frozenset({"lan", "https", "legacy"})
@@ -30,9 +32,13 @@ def add_access_event(
     if instant.tzinfo is None:
         raise ValueError("Access event time must include a timezone")
     stamp = instant.astimezone(timezone.utc)
+    property_id = require_property_id(gate.get("property_id"))
+    if booking is not None and booking.get("property_id") != property_id:
+        raise ValueError("Prenotazione di un altra struttura.")
     matched = booking if result == "authorized" and booking else {}
     entry = {
         "at": stamp.isoformat(),
+        "property_id": property_id,
         "source": source,
         "result": result,
         "gate_id": str(gate.get("id", ""))[:128],
