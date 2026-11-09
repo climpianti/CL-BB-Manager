@@ -36,7 +36,10 @@ def setup(monkeypatch, *, physical_grant=True, online=True):
     manager.data["physical_access_enabled"] = True
     if physical_grant:
         manager.data["bookings"][0]["physical_gate_ids"] = [gate["id"]]
-    hass.states[REAL] = SimpleNamespace(state="off" if online else "unavailable")
+    hass.states[REAL] = SimpleNamespace(state="off")
+    hass.states["switch.porta_scale"] = SimpleNamespace(
+        state="off" if online else "unavailable"
+    )
     monkeypatch.setattr(physical_policy, "PHYSICAL_RELEASE_ENABLED", True)
     monkeypatch.setattr(physical_http, "PHYSICAL_RELEASE_ENABLED", True)
     return manager, hass
@@ -161,4 +164,38 @@ def test_physical_policy_without_monkeypatch_never_reports_real_target():
     }
     manager.data["physical_access_enabled"] = True
     hass.states[REAL] = SimpleNamespace(state="off")
+    hass.states["switch.porta_scale"] = SimpleNamespace(state="off")
     assert physical_policy.physical_target(manager, gate, hass, token=TOKEN) is None
+
+
+def test_unknown_real_script_is_not_approved_even_if_available(monkeypatch):
+    manager, hass = setup(monkeypatch)
+    candidate = manager.data["gates"][0]["hardware_candidate"]
+    candidate["entity_id"] = "script.unknown_open_door"
+    hass.states["script.unknown_open_door"] = SimpleNamespace(state="off")
+    assert physical_policy.physical_target(
+        manager, manager.data["gates"][0], hass, token=TOKEN
+    ) is None
+
+
+def test_expected_shelly_relay_must_be_off_and_present(monkeypatch):
+    manager, hass = setup(monkeypatch)
+    gate = manager.data["gates"][0]
+    assert physical_policy.physical_target(manager, gate, hass, token=TOKEN) == REAL
+    for bad_state in ("unavailable", "unknown", "on"):
+        hass.states["switch.porta_scale"].state = bad_state
+        assert physical_policy.physical_target(manager, gate, hass, token=TOKEN) is None
+    hass.states.pop("switch.porta_scale")
+    assert physical_policy.physical_target(manager, gate, hass, token=TOKEN) is None
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf"), True])
+def test_cooldown_rejects_invalid_clock(bad):
+    data = {}
+    assert physical_policy.take_cooldown(data, "gate", now=bad) is False
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf"), True])
+def test_cooldown_rejects_corrupt_saved_timestamp(bad):
+    data = {"physical_last_action": {"gate": bad}}
+    assert physical_policy.take_cooldown(data, "gate", now=5000) is False
