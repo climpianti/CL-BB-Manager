@@ -19,6 +19,19 @@ from .property_scope import require_record_scope
 from .public_policy import validate_public_origin
 
 
+def invalidate_gate_physical_credentials(manager, gate_id: str) -> None:
+    """Revoke physical QR and grants on mapping change, under manager.lock."""
+    gate = next((g for g in manager.data["gates"] if g.get("id") == gate_id), None)
+    if gate is not None:
+        gate["physical_enabled"] = False
+        gate.pop("physical_token", None)
+    for booking in manager.data["bookings"]:
+        ids = booking.get("physical_gate_ids")
+        if isinstance(ids, list):
+            booking["physical_gate_ids"] = [g for g in ids if g != gate_id]
+    manager.physical_forms.clear()
+
+
 def register_physical_admin_commands(hass, authorize, summary, send_error):
     """Register admin-only preparation, revocation and safety operations."""
 
@@ -163,11 +176,7 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
         async with manager.lock:
             manager.data["physical_access_enabled"] = False
             for gate in manager.data["gates"]:
-                gate["physical_enabled"] = False
-                gate.pop("physical_token", None)
-            for booking in manager.data["bookings"]:
-                booking.pop("physical_gate_ids", None)
-            manager.physical_forms.clear()
+                invalidate_gate_physical_credentials(manager, gate["id"])
             manager.audit("physical_emergency_disabled")
             await manager.async_save()
         connection.send_result(msg["id"], {
