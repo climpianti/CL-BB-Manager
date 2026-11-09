@@ -557,6 +557,30 @@ def register_commands(hass):
             _error(connection, msg, err)
 
     @websocket_api.websocket_command({
+        "type": "cl_bb_manager/hardware_preflight",
+    })
+    @websocket_api.async_response
+    async def hardware_preflight_report(hass, connection, msg):
+        """Admin-only readiness report; never opens or arms a physical gate."""
+        from .guest import DEMO_SCRIPTS
+        from .hardware_preflight import hardware_preflight
+
+        manager = _authorize(hass, connection, msg, admin_only=True)
+        if manager is None:
+            return
+        async with manager.lock:
+            report = [
+                hardware_preflight(gate, manager.property_id, hass, DEMO_SCRIPTS)
+                for gate in manager.data["gates"]
+                if gate.get("hardware_candidate") is not None
+            ]
+        connection.send_result(msg["id"], {
+            "hardware_control": "disabled",
+            "physical_qr_enabled": False,
+            "gates": report,
+        })
+
+    @websocket_api.websocket_command({
         "type": "cl_bb_manager/permanent_pilot_qr",
         vol.Required("gate_id"): str,
     })
@@ -639,6 +663,6 @@ def register_commands(hass):
             _error(connection, msg, err)
 
     for handler in (
-        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin, demo_qr, public_pilot_qr, permanent_pilot_qr, rotate_permanent_qr, stage_hardware_gate, clear_hardware_gate
+        get_list, add_gate, update_gate, remove_gate, add_booking, revoke_booking, get_qr, demo_check_pin, demo_qr, public_pilot_qr, permanent_pilot_qr, rotate_permanent_qr, stage_hardware_gate, clear_hardware_gate, hardware_preflight_report
     ):
         websocket_api.async_register_command(hass, handler)

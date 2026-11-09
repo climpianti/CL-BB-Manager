@@ -13,12 +13,11 @@ from homeassistant.components.http import HomeAssistantView
 from .access_history import add_access_event
 from .const import DOMAIN
 from .demo_http import _response
-from .demo_policy import valid_form_origin
 from .guest import DEMO_SCRIPTS
 from .models import pin_matches
 from .permanent_policy import consume_form, issue_form
 from .property_scope import belongs_to_property
-from .public_policy import validate_public_origin
+from .public_policy import validate_public_origin, valid_https_form_origin
 from .security import candidate_bookings, charge_attempt, demo_target_allowed
 
 
@@ -91,7 +90,7 @@ class PermanentPilotView(HomeAssistantView):
         except (ValueError, web.HTTPException) as exc:
             raise web.HTTPBadRequest() from exc
 
-        if not valid_form_origin(
+        if not valid_https_form_origin(
             request.headers.get("Origin"),
             request.headers.get("Sec-Fetch-Site"),
             origin,

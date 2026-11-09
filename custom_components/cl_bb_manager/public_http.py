@@ -13,11 +13,10 @@ from homeassistant.components.http import HomeAssistantView
 from .const import DOMAIN
 from .access_history import add_access_event
 from .demo_http import _response
-from .demo_policy import valid_form_origin
 from .guest import DEMO_SCRIPTS
 from .models import pin_matches
 from .property_scope import belongs_to_property
-from .public_policy import valid_public_session
+from .public_policy import valid_public_session, valid_https_form_origin
 from .security import charge_attempt, candidate_bookings, demo_target_allowed
 
 
@@ -76,7 +75,7 @@ class PublicPilotView(HomeAssistantView):
         ):
             return _response(gate["name"], "Sessione non valida. Apri nuovamente il QR.", 403)
 
-        if not valid_form_origin(
+        if not valid_https_form_origin(
             request.headers.get("Origin"),
             request.headers.get("Sec-Fetch-Site"),
             session["origin"],
