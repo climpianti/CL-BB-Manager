@@ -34,5 +34,5 @@ def test_permanent_route_opt_in_and_virtual_only():
     assert 'default=self.config_entry.options.get("permanent_pilot_enabled", False)' in opts
     assert 'permanent_pilot_qr' in panel
     assert 'rotate_permanent_qr' in panel
-    assert 'download="CL-BB-QR-' not in panel  # generated via DOM property, never HTML injection
+    assert 'preview.innerHTML' not in panel  # the QR is rendered as an image, not injected HTML
     assert 'download.download="CL-BB-QR-"' in panel
