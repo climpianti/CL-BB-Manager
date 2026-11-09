@@ -72,7 +72,7 @@ def public_access_history(data: dict[str, Any]) -> list[dict[str, Any]]:
         return []
     cutoff = datetime.now(timezone.utc) - timedelta(days=ACCESS_HISTORY_DAYS)
     allowed = (
-        "at", "source", "result", "gate_id", "gate_name",
+        "at", "property_id", "source", "result", "gate_id", "gate_name",
         "booking_id", "room", "guest_name",
     )
     output = []
