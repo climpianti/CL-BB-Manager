@@ -51,12 +51,15 @@ demo_http = load_module("demo_http")
 
 
 class DemoManager:
+    property_id = "2bb950a2-a1c5-46ca-b192-9ad03b1f8ca5"
+
     def __init__(self, booking):
         self.lock = asyncio.Lock()
         self.demo_sessions = {}
         self.data = {
             "gates": [{
                 "id": "camera-1",
+                "property_id": self.property_id,
                 "name": "Camera 1",
                 "enabled": True,
                 "entity_id": "script.cl_bb_demo_apri_camera_1",
@@ -66,6 +69,7 @@ class DemoManager:
             "bookings": [booking],
             "events": [],
         }
+        booking["property_id"] = self.property_id
         self.saves = 0
 
     async def async_save(self):
