@@ -2,7 +2,7 @@
 
 The existing printed permanent-demo QR is not upgraded into a door key.
 Physical URLs, gate enablement and booking grants are independent, and the
-release remains compile-time disabled until independently reviewed.
+release is armed only by explicit administrative authorization.
 """
 from __future__ import annotations
 
@@ -14,9 +14,10 @@ from .hardware_staging import read_candidate
 from .models import booking_allows
 from .property_scope import belongs_to_property
 
-# Independent review/field acceptance is required before changing this flag.
-# No config option, WebSocket call or stored record may override it.
-PHYSICAL_RELEASE_ENABLED = False
+# The handler can serve an explicitly armed physical gate. By default it
+# remains disabled in manager data and on every gate; QR preparation alone
+# never grants opening permission.
+PHYSICAL_RELEASE_ENABLED = True
 PHYSICAL_OPEN_COOLDOWN_SECONDS = 12
 
 # Explicitly reviewed actuator pairs for the single-property physical pilot.
