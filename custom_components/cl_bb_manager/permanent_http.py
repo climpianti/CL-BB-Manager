@@ -107,6 +107,8 @@ class PermanentPilotView(HomeAssistantView):
             )
             if (
                 current is not gate
+                or not isinstance(current.get("token"), str)
+                or not secrets.compare_digest(current["token"], token)
                 or not manager.entry.options.get("permanent_pilot_enabled", False)
                 or not belongs_to_property(current, manager.property_id)
                 or not demo_target_allowed(current, DEMO_SCRIPTS)
