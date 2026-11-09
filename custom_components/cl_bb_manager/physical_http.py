@@ -68,7 +68,7 @@ class PhysicalGuestView(HomeAssistantView):
                 raise web.HTTPServiceUnavailable() from exc
         return _response(
             gate["name"], "Inserisci il PIN della prenotazione autorizzata.",
-            form_csrf=csrf,
+            form_csrf=csrf, physical=True,
         )
 
     async def post(self, request, token):
@@ -106,7 +106,7 @@ class PhysicalGuestView(HomeAssistantView):
             except (ValueError, TypeError) as exc:
                 raise web.HTTPServiceUnavailable() from exc
             if not permitted:
-                return _response(gate["name"], "Troppi tentativi. Riprova più tardi.", 429)
+                return _response(gate["name"], "Troppi tentativi. Riprova più tardi.", 429, physical=True)
 
             matched = None
             if len(pin) == 8 and pin.isascii() and pin.isdecimal():
@@ -127,10 +127,10 @@ class PhysicalGuestView(HomeAssistantView):
             if matched is None:
                 manager.audit("physical_denied", gate["id"])
                 await manager.async_save()
-                return _response(gate["name"], "Codice non valido o non autorizzato.", 403)
+                return _response(gate["name"], "Codice non valido o non autorizzato.", 403, physical=True)
 
             if not take_cooldown(manager.data, gate["id"]):
-                return _response(gate["name"], "Attendere prima di riprovare.", 429)
+                return _response(gate["name"], "Attendere prima di riprovare.", 429, physical=True)
             # Persist the safety reservation before any potentially uncertain
             # switch operation. No retry on timeout.
             manager.audit("physical_attempt", gate["id"])
@@ -152,5 +152,5 @@ class PhysicalGuestView(HomeAssistantView):
         return _response(
             gate["name"],
             "Comando inviato. Verifica l'apertura della porta.",
-            complete=False,
+            complete=True, physical=True,
         )
