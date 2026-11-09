@@ -18,6 +18,7 @@ from .access_history import public_access_history
 from .guest import GuestView
 from .demo_http import DemoPortalView
 from .public_http import PublicPilotView
+from .permanent_http import PermanentPilotView
 from .const import DOMAIN, MAX_EVENTS, PANEL_PATH, PANEL_RESOURCE, STORE_KEY
 from .models import public_booking
 from .property_migration import migrate_legacy_data, SCHEMA_VERSION
@@ -36,6 +37,8 @@ class BBManager:
         # Deliberately not persisted across HA restarts.
         self.demo_sessions = {}
         self.public_demo_sessions = {}
+        # Volatile, one-use browser form proofs; QR gate tokens stay persisted.
+        self.permanent_forms = {}
         self.data = {"gates": [], "bookings": [], "events": [], "access_history": []}
 
     async def async_load(self):
@@ -127,6 +130,7 @@ class BBManager:
             "role": role,
             "guest_portal": "disabled",
             "public_pilot": "enabled" if self.entry.options.get("public_pilot_enabled", False) else "disabled",
+            "permanent_pilot": "enabled" if self.entry.options.get("permanent_pilot_enabled", False) else "disabled",
             "hardware_control": "disabled",
         }
 
@@ -150,6 +154,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         hass.http.register_view(GuestView())
         hass.http.register_view(DemoPortalView())
         hass.http.register_view(PublicPilotView())
+        hass.http.register_view(PermanentPilotView())
         domain_data["routes_registered"] = True
 
     await panel_custom.async_register_panel(
