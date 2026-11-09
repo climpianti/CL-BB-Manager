@@ -21,6 +21,13 @@ ws.async_response = lambda fn: fn
 registered = {}
 ws.async_register_command = lambda hass, handler: registered.__setitem__(handler.__name__, handler)
 sys.modules["homeassistant.components.websocket_api"] = ws
+# segno is a runtime dependency but absent from the lightweight model CI.
+segno = types.ModuleType("segno")
+class FakeQR:
+    def save(self, buffer, **kwargs):
+        buffer.write(b"<svg/>")
+segno.make_qr = lambda url: FakeQR()
+sys.modules.setdefault("segno", segno)
 # The import is independent from real Home Assistant.
 physical_admin = base.load_module("physical_admin")
 
