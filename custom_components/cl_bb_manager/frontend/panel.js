@@ -12,10 +12,10 @@ class ClBbManagerPanel extends HTMLElement {
  select(form,label,name,options,selected){const wrap=this.node("label",label);const s=this.node("select");s.name=name;for(const [v,t] of options){const o=this.node("option",t);o.value=v;o.selected=v===selected;s.append(o);}wrap.append(s);form.append(wrap);}
  card(title){const a=this.node("section","","card");a.append(this.node("h2",title));return a;}
  render(){const root=this.shadowRoot;root.replaceChildren();const style=this.node("style");
- style.textContent="@import url('/cl_bb_manager_static/bluetech-glass.css?v=0.5.0-alpha.8');";root.append(style);
+ style.textContent="@import url('/cl_bb_manager_static/bluetech-glass.css?v=0.5.0-alpha.9');";root.append(style);
  const page=this.node("main","","page");root.append(page);const hero=this.node("header","","hero");
  const brand=this.node("div","","hero-brand");
- const logo=this.node("img");logo.src="/cl_bb_manager_static/cl-impianti-logo.svg?v=0.5.0-alpha.8";logo.alt="CL Impianti";logo.className="brand-logo";logo.decoding="async";brand.append(logo);
+ const logo=this.node("img");logo.src="/cl_bb_manager_static/cl-impianti-logo.svg?v=0.5.0-alpha.9";logo.alt="CL Impianti";logo.className="brand-logo";logo.decoding="async";brand.append(logo);
  const brandText=this.node("span","","brand-word");
  brandText.append(this.node("strong","CL CONTROL"),this.node("small","Hospitality · Access Manager"));
  brand.append(brandText);
@@ -153,7 +153,7 @@ class ClBbManagerPanel extends HTMLElement {
    modes.append(internet,local);
    modeCard.append(modes);
    grid.append(modeCard);
-   const publicCard=this.card("QR di accesso · HTTPS");
+   const publicCard=this.card("QR temporaneo · HTTPS · 10 minuti");
    const externalUrl=this._hass?.config?.external_url||"";
    publicCard.append(this.node("p",externalUrl
      ?"Indirizzo pubblico: "+externalUrl
@@ -167,7 +167,7 @@ class ClBbManagerPanel extends HTMLElement {
    const publicForm=this.node("form");
    this.select(publicForm,"Varco virtuale","gate_id",
      gates.map(g=>[g.id,g.name]),this.demoTargetGateId||gates[0].id);
-   const makePublic=this.node("button","Genera QR di accesso");
+   const makePublic=this.node("button","Genera QR temporaneo (10 minuti)");
    makePublic.type="submit";
    publicForm.append(makePublic);
    publicForm.onsubmit=async event=>{
@@ -203,7 +203,7 @@ class ClBbManagerPanel extends HTMLElement {
      img.height=220;
      img.alt="QR di accesso per "+this.publicQR.gate;
      preview.append(img);
-     preview.append(this.node("p","QR valido per 10 minuti e utilizzabile una sola volta. Condividilo solo con il destinatario.","small"));
+     preview.append(this.node("p","NON STAMPARE: questo QR scade dopo 10 minuti ed è monouso. Per un QR da applicare alla porta usa il riquadro QR permanente qui sopra.","small"));
      const link=this.node("a","Apri pagina di accesso");
      link.href=this.publicQR.url;
      link.target="_blank";
@@ -211,13 +211,12 @@ class ClBbManagerPanel extends HTMLElement {
      preview.append(link);
      publicCard.append(preview);
    }
-   if(this.qrMode==="https")grid.append(publicCard);
 
     if(this.qrMode==="https" && this.data.role==="admin"){
       const fixed=this.card("QR permanente stampabile · varchi virtuali");
       fixed.append(this.node("p","Il QR resta uguale per ogni porta, anche cambiando gli ospiti. Ogni accesso richiede un PIN valido, e l'amministratore può revocare il QR stampato. Non utilizzare su porte fisiche.","small"));
       if(this.data.permanent_pilot!=="enabled"){
-        fixed.append(this.node("p","Attiva «QR permanente solo varchi virtuali» nelle opzioni dell'integrazione. Richiede dominio HTTPS.","notice"));
+        fixed.append(this.node("p","Per creare il QR da stampare, vai in Home Assistant → Impostazioni → Dispositivi e servizi → CL B&B Manager → Configura → Accesso HTTPS e operatori e attiva «QR permanente solo varchi virtuali». Poi torna qui. Richiede dominio HTTPS.","notice"));
       }else{
         const form=this.node("form");
         this.select(form,"Varco per QR fisso","gate_id",gates.map(g=>[g.id,g.name]),this.demoTargetGateId||gates[0].id);
@@ -258,6 +257,8 @@ class ClBbManagerPanel extends HTMLElement {
       grid.append(fixed);
     }
 
+   // The printable QR is the primary choice. Show the temporary demo beneath it.
+   if(this.qrMode==="https")grid.append(publicCard);
    const qrCard=this.card("QR di accesso · rete locale");
    qrCard.append(this.node(
      "p",
@@ -322,7 +323,7 @@ class ClBbManagerPanel extends HTMLElement {
    }
    if(this.qrMode==="lan")grid.append(qrCard);
    const info=this.card("Informazioni di servizio");
-   info.append(this.node("p","Portale permanente: disattivato","small"),
+   info.append(this.node("p","QR permanente HTTPS: "+(this.data.permanent_pilot==="enabled"?"abilitato (solo demo virtuale)":"disabilitato"),"small"),
                this.node("p","Collegamenti autorizzati: soltanto script virtuali","small"),
                this.node("p","Comandi verso serrature fisiche: disattivati","small"));
    grid.append(info);
