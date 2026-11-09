@@ -108,7 +108,7 @@ def _response(gate_name: str, message: str = "", status: int = 200, *, form_csrf
         "Codice protetto · Sessione temporanea</div>"
         + ("</main><p class='disclaimer'>L'invio del comando non conferma lo sblocco della serratura.</p>"
          if physical else "</main><p class='disclaimer'>Ambiente pilota: nessuna porta fisica viene comandata.</p>")
-        "</div></body></html>"
+        + "</div></body></html>"
     )
     return web.Response(
         text=document, content_type="text/html", status=status,
