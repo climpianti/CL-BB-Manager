@@ -93,4 +93,6 @@ def test_non_executable_candidate_is_not_read_by_public_routes():
     assert 'admin_only=True' in api.split('async def clear_hardware_gate', 1)[1].split('async def permanent_pilot_qr',1)[0]
     assert 'gate[FIELD] = candidate' in api
     assert "gate[\"entity_id\"] = candidate" not in api
-    assert '"hardware_control": "disabled"' in (ROOT / "__init__.py").read_text(encoding="utf-8")
+    summary_code = (ROOT / "__init__.py").read_text(encoding="utf-8")
+    assert 'self.data.get("physical_access_enabled") is True' in summary_code
+    assert 'g.get("physical_enabled") is True' in summary_code
