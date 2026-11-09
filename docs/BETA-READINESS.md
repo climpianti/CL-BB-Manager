@@ -34,3 +34,19 @@ Questa checklist distingue test eseguiti da attività ancora aperte. La release 
 ## Sicurezza
 
 L'integrazione mantiene `hardware_control: disabled`. Gli endpoint permanenti ospite restano inattivi. I soli script ammessi per i test sono i cinque `script.cl_bb_demo_apri_*`, *dopo aver verificato* che attivino esclusivamente helper virtuali. La beta non deve essere dichiarata pronta né usata per porte reali finché le attività sopra non risultano completate e documentate.
+
+
+## Revisione QR fisico — alpha.11 (9 novembre 2026)
+
+- [x] Collaudo manuale separato dei due Shelly: Porta Strada e Porta Scala, feedback fisico positivo dell'operatore.
+- [x] Associazioni hardware salvate come candidati non eseguibili, senza sostituire script virtuali, prenotazioni o token QR.
+- [x] Controllo esplicito dell'Origin HTTPS: un Origin diverso, `null`, protocollo HTTP, Sec-Fetch-Site `cross-site` o `same-site` sono respinti anche se il CSRF è valido.
+- [x] Moduli mobili senza Origin restano ammessi solo con fetch metadata compatibili e CSRF monouso valido; l'assenza di Origin non sostituisce il controllo CSRF.
+- [x] Preflight amministrativo di sola lettura: stato candidato, esistenza script, varco virtuale e motivi di blocco.
+- [x] Test automatici dei casi di origine non valida, preflight non attivante e isolamento QR.
+- [ ] Revisione di sicurezza indipendente e prove negative end-to-end effettuate dall'esterno su rete mobile, inclusi Origin/Host/proxy, CSRF/replay, PIN errato, scaduto, revocato, concorrenza, rate limit e riavvio.
+- [ ] Piano documentato e verificato di recupero/rollback, backup e monitoraggio per porte reali.
+- [ ] Verifica del comportamento con Shelly offline, stato incerto e comando accettato senza reale apertura; eventuali sensori di conferma porta.
+- [ ] Approvazione esplicita di un rilascio successivo con attivazione fisica gestita; **alpha.11 non abilita nessuna apertura fisica via QR**.
+
+Comando di verifica: `cl_bb_manager/hardware_preflight` via WebSocket autenticato amministratore, oppure pulsante **Verifica prerequisiti QR fisico** nel pannello Varchi. Nessun campo del report può abilitare serrature; `hardware_control` resta `disabled` e `physical_qr_enabled` sempre `false`.
