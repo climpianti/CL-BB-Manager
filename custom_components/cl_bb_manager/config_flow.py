@@ -49,8 +49,31 @@ class CLBBManagerOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input=None):
         return self.async_show_menu(
-            step_id="init", menu_options=["access", "gates"]
+            step_id="init", menu_options=["access", "gates", "qr_branding"]
         )
+
+    async def async_step_qr_branding(self, user_input=None):
+        from .qr_branding import async_update_branding, branding_status
+        manager = self._manager()
+        if manager is None:
+            return self.async_abort(reason="not_ready")
+        errors = {}
+        if user_input is not None:
+            try:
+                await async_update_branding(manager, enabled=user_input.get("enabled", True),
+                    file_id=user_input.get("logo"), remove_logo=user_input.get("remove_logo", False))
+            except (ValueError, TypeError):
+                errors["base"] = "invalid_qr_logo"
+            else:
+                return self.async_create_entry(title="", data=self._unchanged_options())
+        state = branding_status(manager.data)
+        return self.async_show_form(step_id="qr_branding", errors=errors,
+            description_placeholders={"logo_status": "Logo presente" if state["has_logo"] else "Nessun logo caricato"},
+            data_schema=vol.Schema({
+                vol.Required("enabled", default=state["enabled"] if state["has_logo"] else True): bool,
+                vol.Optional("logo"): selector.FileSelector(selector.FileSelectorConfig(accept="image/png,image/jpeg,image/webp")),
+                vol.Optional("remove_logo", default=False): bool,
+            }))
 
     async def async_step_access(self, user_input=None):
         """Persist operator selection without changing existing gates or grants."""

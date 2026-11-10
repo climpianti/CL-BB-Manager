@@ -113,7 +113,7 @@ def _response(
         "@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}"
         "</style></head><body>"
         "<div class='wrap'><main>"
-        "<div class='brand'><img class='brand-logo' src='/cl_bb_manager_static/cl-impianti-logo.svg?v=0.6.0-beta.3' alt='CL Impianti'><span class='brand-copy'>"
+        "<div class='brand'><img class='brand-logo' src='/cl_bb_manager_static/cl-impianti-logo.svg?v=0.6.0-beta.4' alt='CL Impianti'><span class='brand-copy'>"
         f"<strong>CL B&amp;B MANAGER</strong><small>{translated('brand_subtitle')}</small></span></div>"
         f"<p class='eyebrow'>{translated('eyebrow')}</p>"
         f"<h1>{name}</h1><p class='description'>{info}</p>"

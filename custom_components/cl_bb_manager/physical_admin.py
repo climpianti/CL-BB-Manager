@@ -5,7 +5,6 @@ administrator confirmation and can be disabled at any time.
 """
 from __future__ import annotations
 
-from io import BytesIO
 from copy import deepcopy
 import secrets
 
@@ -13,6 +12,7 @@ from homeassistant.components import websocket_api
 import voluptuous as vol
 
 from .const import DOMAIN
+from .qr_branding import render_qr
 from .hardware_staging import read_candidate
 from .physical_policy import PILOT_SCRIPT_RELAY, PHYSICAL_RELEASE_ENABLED, ready_actuator
 from .property_scope import require_record_scope
@@ -47,7 +47,6 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
         if manager is None:
             return
         try:
-            import segno
             origin = validate_public_origin(
                 hass.config.external_url or manager.entry.options.get("public_origin")
                 or manager.entry.options.get("public_pilot_origin", "")
@@ -65,6 +64,8 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
                 token = secrets.token_urlsafe(36)
                 while token == gate.get("token") or token == gate.get("physical_token"):
                     token = secrets.token_urlsafe(36)
+                url = origin + "/api/cl_bb_manager/physical/" + token
+                artwork = await hass.async_add_executor_job(render_qr, url, deepcopy(manager.data.get("qr_branding")))
                 gate["physical_token"] = token
                 gate["physical_enabled"] = False
                 manager.physical_forms.clear()
@@ -72,12 +73,10 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
                 await manager.async_save()
                 name = gate["name"]
             url = origin + "/api/cl_bb_manager/physical/" + token
-            buffer = BytesIO()
-            segno.make_qr(url).save(buffer, kind="svg", scale=8, border=4)
             connection.send_result(msg["id"], {
                 "gate_id": msg["gate_id"],
                 "name": name,
-                "svg": buffer.getvalue().decode("utf-8"),
+                **artwork,
                 "url": url,
                 "armed": False,
                 "release_enabled": PHYSICAL_RELEASE_ENABLED,
@@ -243,7 +242,6 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
         if manager is None:
             return
         try:
-            import segno
             origin = validate_public_origin(hass.config.external_url
                 or manager.entry.options.get("public_origin")
                 or manager.entry.options.get("public_pilot_origin", ""))
@@ -255,11 +253,10 @@ def register_physical_admin_commands(hass, authorize, summary, send_error):
             if not isinstance(token, str) or not 40 <= len(token) <= 100:
                 raise ValueError("QR non ancora predisposto per questo varco.")
             target = origin + "/api/cl_bb_manager/physical/" + token
-            buffer = BytesIO()
-            segno.make_qr(target).save(buffer, kind="svg", scale=8, border=4)
+            artwork = await hass.async_add_executor_job(render_qr, target, deepcopy(manager.data.get("qr_branding")))
             connection.send_result(msg["id"], {
                 "gate_id": gate["id"], "name": gate["name"],
-                "url": target, "svg": buffer.getvalue().decode(),
+                "url": target, **artwork,
                 "armed": gate.get("physical_enabled") is True,
             })
         except (ValueError, TypeError, KeyError) as err:

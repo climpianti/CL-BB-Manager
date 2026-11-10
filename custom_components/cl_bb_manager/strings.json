@@ -20,7 +20,8 @@
         "description": "Gestisci le autorizzazioni degli operatori e configura i varchi della struttura. Le modifiche ai varchi sono riservate agli amministratori.",
         "menu_options": {
           "access": "Modifica operatori e accesso HTTPS",
-          "gates": "Gestione varchi"
+          "gates": "Gestione varchi",
+          "qr_branding": "Logo nei QR"
         }
       },
       "access": {
@@ -103,13 +104,23 @@
           "confirm_device_pulse": "Confermo il timer locale già configurato (solo device_pulse)",
           "confirm": "Confermo entità e comando associati alla porta"
         }
+      },
+      "qr_branding": {
+        "title": "Logo al centro dei QR",
+        "description": "{logo_status}. Carica un logo PNG, JPG o WebP (massimo 1 MB e 2048 × 2048 pixel). Il logo viene applicato automaticamente ai QR scaricati, con correzione degli errori alta e dimensione centrale limitata. I QR e i collegamenti già stampati restano validi. Lascia il file vuoto per conservare il logo attuale.",
+        "data": {
+          "enabled": "Mostra il logo nei QR",
+          "logo": "Carica o sostituisci logo",
+          "remove_logo": "Rimuovi il logo salvato"
+        }
       }
     },
     "error": {
       "invalid_public_origin": "Indica un indirizzo HTTPS valido senza percorso o porta.",
       "invalid_operator_users": "Seleziona soltanto utenti Home Assistant attivi, non amministratori, fino a 20 operatori.",
       "invalid_gate": "Configurazione non completata. Verifica entità disponibile, comando supportato, nome e conferme. I relè devono essere OFF e gli script inattivi. Durata impulso: 0,5–5 secondi.",
-      "gate_has_bookings": "Impossibile eliminare il varco: revoca prima le prenotazioni ancora valide che lo utilizzano."
+      "gate_has_bookings": "Impossibile eliminare il varco: revoca prima le prenotazioni ancora valide che lo utilizzano.",
+      "invalid_qr_logo": "Logo non salvato. Usa un PNG, JPG o WebP statico, massimo 1 MB e 2048 × 2048 pixel. Seleziona nuovamente il file per riprovare. Non selezionare caricamento e rimozione insieme."
     },
     "abort": {
       "not_ready": "Il gestore B&B non è ancora pronto. Riprova quando l'integrazione è caricata.",
