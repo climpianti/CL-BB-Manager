@@ -28,30 +28,37 @@ PILOT_SCRIPT_RELAY = {
 }
 
 
-def physical_target(manager, gate: dict, hass, *, token: str | None = None):
-    """Return the bound actuator only when every independent guard succeeds."""
+def physical_gate_enabled(manager, gate: dict, *, token: str | None = None) -> bool:
+    """Check permanent QR identity and arming independently of device availability."""
     if not PHYSICAL_RELEASE_ENABLED:
-        return None
+        return False
     if manager.data.get("physical_access_enabled") is not True:
-        return None
+        return False
     if not belongs_to_property(gate, manager.property_id):
-        return None
+        return False
     if gate.get("enabled") is not True or gate.get("physical_enabled") is not True:
-        return None
+        return False
     physical_token = gate.get("physical_token")
     if (
         not isinstance(physical_token, str)
         or not 40 <= len(physical_token) <= 100
     ):
-        return None
+        return False
     if token is not None and (
         not isinstance(token, str)
         or len(token) != len(physical_token)
         or not secrets.compare_digest(token, physical_token)
     ):
-        return None
+        return False
     # Deliberately separate from original demo entity and token.
     if physical_token == gate.get("token"):
+        return False
+    return True
+
+
+def physical_target(manager, gate: dict, hass, *, token: str | None = None):
+    """Return a real actuator only when the permanent QR AND hardware are ready."""
+    if not physical_gate_enabled(manager, gate, token=token):
         return None
     return ready_actuator(gate, hass)
 

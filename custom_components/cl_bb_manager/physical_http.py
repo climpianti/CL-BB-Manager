@@ -14,7 +14,7 @@ from .demo_http import _response, _security_rejection
 from .models import pin_matches
 from .permanent_policy import consume_form, issue_form
 from .physical_policy import (
-    PHYSICAL_RELEASE_ENABLED, approved_booking, physical_target, take_cooldown,
+    PHYSICAL_RELEASE_ENABLED, approved_booking, physical_gate_enabled, physical_target, take_cooldown,
 )
 from .public_policy import valid_https_form_origin, validate_public_origin
 from .security import candidate_bookings, charge_attempt
@@ -46,7 +46,7 @@ def _context(request, token: str):
         and isinstance(gate.get("physical_token"), str)
         and secrets.compare_digest(token, gate["physical_token"])
     ]
-    if len(matches) != 1 or physical_target(manager, matches[0], hass, token=token) is None:
+    if len(matches) != 1 or not physical_gate_enabled(manager, matches[0], token=token):
         raise web.HTTPNotFound()
     return hass, manager, origin, matches[0]
 
@@ -81,7 +81,10 @@ class PhysicalGuestView(HomeAssistantView):
         language = browser_language(request.headers.get("Accept-Language"))
         _, manager, _, gate = _context(request, token)
         async with manager.lock:
-            if physical_target(manager, gate, manager.hass, token=token) is None:
+            # A permanent QR is not a one-use link and must remain reachable
+            # during transient hardware offline/unknown states. The POST path
+            # separately checks live actuator readiness before any command.
+            if not physical_gate_enabled(manager, gate, token=token):
                 raise web.HTTPNotFound()
             try:
                 csrf = issue_form(manager.physical_forms, gate["id"])
@@ -124,7 +127,9 @@ class PhysicalGuestView(HomeAssistantView):
                 )
             script_id = physical_target(manager, gate, hass, token=token)
             if script_id is None:
-                raise web.HTTPNotFound()
+                # QR remains persistent, but an offline/unknown lock must never
+                # be treated as ready or receive an unlock service call.
+                raise web.HTTPServiceUnavailable()
 
             throttle = manager.data.setdefault("attempts", {"all": [], "gates": {}})
             try:

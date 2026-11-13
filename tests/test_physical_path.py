@@ -124,10 +124,36 @@ def test_hypothetical_hardware_errors_fail_closed(monkeypatch, failure):
             gate["physical_enabled"] = False
         else:
             gate["hardware_candidate"]["entity_id"] = VIRTUAL
-        with pytest.raises(web.HTTPNotFound):
-            await physical_http.PhysicalGuestView().get(
-                fixture.request(hass), TOKEN
-            )
+        if failure in ("not_armed", "gate_disabled"):
+            with pytest.raises(web.HTTPNotFound):
+                await physical_http.PhysicalGuestView().get(
+                    fixture.request(hass), TOKEN
+                )
+        else:
+            # The token is permanent: transient offline/changed actuators
+            # must not make the QR itself disappear.
+            req = await form(manager, hass)
+            with pytest.raises(web.HTTPServiceUnavailable):
+                await physical_http.PhysicalGuestView().post(req, TOKEN)
+        assert hass.calls == []
+        assert gate["physical_token"] == TOKEN
+    asyncio.run(check())
+
+
+def test_offline_lock_keeps_qr_reusable_without_unlock(monkeypatch):
+    async def check():
+        manager, hass = setup(monkeypatch)
+        gate = manager.data["gates"][0]
+        # Simulate a Yale BLE lock returning unknown/unavailable, without
+        # any actual lock service or network call.
+        monkeypatch.setattr(physical_policy, "ready_actuator",
+                            lambda gate, hass: None)
+        first = await form(manager, hass)
+        with pytest.raises(web.HTTPServiceUnavailable):
+            await physical_http.PhysicalGuestView().post(first, TOKEN)
+        second = await form(manager, hass)
+        assert second is not None
+        assert gate["physical_token"] == TOKEN
         assert hass.calls == []
     asyncio.run(check())
 
